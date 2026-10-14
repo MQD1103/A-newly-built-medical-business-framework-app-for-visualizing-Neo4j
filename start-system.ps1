@@ -5,6 +5,8 @@ $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Backend = Join-Path $Root 'backend'
 $Frontend = Join-Path $Root 'frontend'
 $VenvPython = Join-Path $Backend '.venv\Scripts\python.exe'
+$VenvDir = Join-Path $Backend '.venv'
+$NodeModules = Join-Path $Frontend 'node_modules'
 $BackendHost = '127.0.0.1'
 $BackendPort = 8000
 $FrontendHost = '127.0.0.1'
@@ -22,20 +24,64 @@ function Write-Step([string]$Message, [string]$Color = 'Cyan') {
   Write-Host "[启动] $Message" -ForegroundColor $Color
 }
 
+function Get-SystemPython {
+  foreach ($name in @('py', 'python')) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd }
+  }
+  return $null
+}
+
 Write-Step '正在检查运行环境...'
 
-if (-not (Test-Path -LiteralPath $VenvPython)) {
-  Write-Host "[错误] 找不到后端虚拟环境: $VenvPython" -ForegroundColor Red
-  Write-Host '请先在 backend 目录创建 .venv 并安装依赖。' -ForegroundColor Yellow
-  exit 1
-}
 if (-not (Test-Path -LiteralPath (Join-Path $Frontend 'package.json'))) {
   Write-Host "[错误] 找不到前端项目: $Frontend" -ForegroundColor Red
   exit 1
 }
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-  Write-Host '[错误] 未找到 npm。请安装 Node.js 并加入 PATH。' -ForegroundColor Red
+if (-not (Test-Path -LiteralPath (Join-Path $Backend 'requirements.txt'))) {
+  Write-Host "[错误] 找不到后端项目: $Backend" -ForegroundColor Red
   exit 1
+}
+
+$npm = Get-Command npm -ErrorAction SilentlyContinue
+if (-not $npm) {
+  Write-Host '[错误] 未找到 npm。请先安装 Node.js（勾选加入 PATH）后重试。' -ForegroundColor Red
+  exit 1
+}
+
+# 首次：自动创建后端虚拟环境并安装依赖
+if (-not (Test-Path -LiteralPath $VenvPython)) {
+  Write-Step '首次运行：正在创建后端虚拟环境并安装依赖（可能需要几分钟）...'
+  $py = Get-SystemPython
+  if (-not $py) {
+    Write-Host '[错误] 未找到 Python。请安装 Python 3.10+ 并勾选「Add to PATH」。' -ForegroundColor Red
+    exit 1
+  }
+  if ($py.Name -eq 'py.exe') {
+    & $py.Source -3 -m venv $VenvDir
+  } else {
+    & $py.Source -m venv $VenvDir
+  }
+  if (-not (Test-Path -LiteralPath $VenvPython)) {
+    Write-Host '[错误] 虚拟环境创建失败。' -ForegroundColor Red
+    exit 1
+  }
+  & $VenvPython -m pip install --upgrade pip
+  & $VenvPython -m pip install -r (Join-Path $Backend 'requirements.txt')
+  Write-Host '[成功] 后端依赖已安装。' -ForegroundColor Green
+}
+
+# 首次：自动安装前端依赖
+if (-not (Test-Path -LiteralPath $NodeModules)) {
+  Write-Step '首次运行：正在安装前端依赖 npm install（可能需要几分钟）...'
+  Push-Location $Frontend
+  try {
+    & npm.cmd install
+    if ($LASTEXITCODE -ne 0) { throw "npm install 失败，退出码 $LASTEXITCODE" }
+  } finally {
+    Pop-Location
+  }
+  Write-Host '[成功] 前端依赖已安装。' -ForegroundColor Green
 }
 
 # 每人本机独立运行，默认只监听 127.0.0.1
@@ -65,7 +111,8 @@ $urls = @(
   "http://localhost:${FrontendPort}/"
 )
 $readyUrl = $null
-for ($i = 0; $i -lt 60; $i++) {
+# 首次装依赖后首次编译可能较慢，多等一会
+for ($i = 0; $i -lt 120; $i++) {
   foreach ($url in $urls) {
     try {
       $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
@@ -87,10 +134,11 @@ if ($readyUrl) {
   Write-Host ''
   Write-Host "前端: $readyUrl" -ForegroundColor Green
   Write-Host "后端: http://${BackendHost}:${BackendPort}  (接口文档 /docs)" -ForegroundColor Green
+  Write-Host '首次打开应看到：节点首页 + COPD 系列课程（售价见详情）。' -ForegroundColor DarkGray
   Write-Host '本机独立运行，关闭本机不影响同事。' -ForegroundColor DarkGray
   Write-Host '停止服务请双击「关闭系统.bat」。' -ForegroundColor DarkGray
   exit 0
 }
 
-Write-Host '[错误] 前端 30 秒内未就绪。请查看弹出的黑色 CMD 窗口报错。' -ForegroundColor Red
+Write-Host '[错误] 前端未能在约 60 秒内就绪。请查看弹出的黑色 CMD 窗口报错。' -ForegroundColor Red
 exit 1
