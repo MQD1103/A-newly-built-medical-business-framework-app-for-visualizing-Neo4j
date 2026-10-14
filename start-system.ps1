@@ -1,8 +1,14 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Backend = Join-Path $Root 'backend'
 $Frontend = Join-Path $Root 'frontend'
 $VenvPython = Join-Path $Backend '.venv\Scripts\python.exe'
+$BackendHost = '127.0.0.1'
+$BackendPort = 8000
+$FrontendHost = '127.0.0.1'
+$FrontendPort = 5173
 
 function Test-PortListen([int]$Port) {
   try {
@@ -12,44 +18,52 @@ function Test-PortListen([int]$Port) {
   }
 }
 
-Write-Host '[Campus] checking environment...' -ForegroundColor Cyan
+function Write-Step([string]$Message, [string]$Color = 'Cyan') {
+  Write-Host "[启动] $Message" -ForegroundColor $Color
+}
+
+Write-Step '正在检查运行环境...'
 
 if (-not (Test-Path -LiteralPath $VenvPython)) {
-  Write-Host "Missing backend venv: $VenvPython" -ForegroundColor Red
-  Write-Host 'Create venv and install deps in backend first.'
+  Write-Host "[错误] 找不到后端虚拟环境: $VenvPython" -ForegroundColor Red
+  Write-Host '请先在 backend 目录创建 .venv 并安装依赖。' -ForegroundColor Yellow
   exit 1
 }
 if (-not (Test-Path -LiteralPath (Join-Path $Frontend 'package.json'))) {
-  Write-Host "Missing frontend: $Frontend" -ForegroundColor Red
+  Write-Host "[错误] 找不到前端项目: $Frontend" -ForegroundColor Red
   exit 1
 }
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-  Write-Host 'npm not found. Install Node.js and add it to PATH.' -ForegroundColor Red
+  Write-Host '[错误] 未找到 npm。请安装 Node.js 并加入 PATH。' -ForegroundColor Red
   exit 1
 }
 
-# 默认只监听本机：每人各自跑自己的后端，不占用同事电脑
-if (-not (Test-PortListen 8000)) {
-  Write-Host '[Campus] starting backend http://127.0.0.1:8000 ...' -ForegroundColor Cyan
-  # Use python -m uvicorn: uvicorn.exe launcher can fail silently on some Windows setups
+# 每人本机独立运行，默认只监听 127.0.0.1
+if (-not (Test-PortListen $BackendPort)) {
+  Write-Step "启动后端 http://${BackendHost}:${BackendPort} ..."
+  $backendCmd = ".venv\Scripts\python.exe -m uvicorn app.main:app --reload --host $BackendHost --port $BackendPort"
   Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList '/k', '.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000' `
+    -ArgumentList '/k', "title 小医-后端:$BackendPort && $backendCmd" `
     -WorkingDirectory $Backend
 } else {
-  Write-Host '[Campus] backend already listening on 8000' -ForegroundColor Yellow
+  Write-Host "[提示] 后端已在端口 $BackendPort 运行，跳过启动。" -ForegroundColor Yellow
 }
 
-if (-not (Test-PortListen 5173)) {
-  Write-Host '[Campus] starting frontend http://127.0.0.1:5173 ...' -ForegroundColor Cyan
+if (-not (Test-PortListen $FrontendPort)) {
+  Write-Step "启动前端 http://${FrontendHost}:${FrontendPort} ..."
+  $frontendCmd = "npm run dev -- --host $FrontendHost --port $FrontendPort"
   Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList '/k', 'npm run dev -- --host 127.0.0.1' `
+    -ArgumentList '/k', "title 小医-前端:$FrontendPort && $frontendCmd" `
     -WorkingDirectory $Frontend
 } else {
-  Write-Host '[Campus] frontend already listening on 5173' -ForegroundColor Yellow
+  Write-Host "[提示] 前端已在端口 $FrontendPort 运行，跳过启动。" -ForegroundColor Yellow
 }
 
-Write-Host '[Campus] waiting for frontend...' -ForegroundColor Cyan
-$urls = @('http://127.0.0.1:5173/', 'http://localhost:5173/')
+Write-Step '等待前端就绪...'
+$urls = @(
+  "http://${FrontendHost}:${FrontendPort}/",
+  "http://localhost:${FrontendPort}/"
+)
 $readyUrl = $null
 for ($i = 0; $i -lt 60; $i++) {
   foreach ($url in $urls) {
@@ -68,14 +82,15 @@ for ($i = 0; $i -lt 60; $i++) {
 }
 
 if ($readyUrl) {
-  Write-Host '[Campus] opening browser...' -ForegroundColor Green
+  Write-Host "[成功] 正在打开浏览器: $readyUrl" -ForegroundColor Green
   Start-Process $readyUrl
-  Write-Host "Started: $readyUrl"
-  Write-Host 'Backend API: http://127.0.0.1:8000  (docs: /docs)' -ForegroundColor Cyan
-  Write-Host '本机独立运行：关电脑也不影响同事（他们用自己的本机服务）。' -ForegroundColor DarkGray
-  Write-Host 'Stop with 关闭系统.bat'
+  Write-Host ''
+  Write-Host "前端: $readyUrl" -ForegroundColor Green
+  Write-Host "后端: http://${BackendHost}:${BackendPort}  (接口文档 /docs)" -ForegroundColor Green
+  Write-Host '本机独立运行，关闭本机不影响同事。' -ForegroundColor DarkGray
+  Write-Host '停止服务请双击「关闭系统.bat」。' -ForegroundColor DarkGray
   exit 0
 }
 
-Write-Host 'Frontend not ready in 30s. Check the black cmd windows for errors.' -ForegroundColor Red
+Write-Host '[错误] 前端 30 秒内未就绪。请查看弹出的黑色 CMD 窗口报错。' -ForegroundColor Red
 exit 1
