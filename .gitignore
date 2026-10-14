@@ -1,0 +1,31 @@
+# Python
+backend/.venv/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+backend/edu.db
+backend/*.db
+
+# 上传文件（本地数据，不进仓库）
+backend/uploads/avatars/
+backend/uploads/community/
+# 保留课程封面等静态资源：只忽略用户上传，课程 svg 可提交
+!backend/uploads/courses/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# 环境变量（团队各自填写，勿提交真实地址/密钥）
+.env
+.env.local
+frontend/.env
+frontend/.env.local
+backend/.env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
