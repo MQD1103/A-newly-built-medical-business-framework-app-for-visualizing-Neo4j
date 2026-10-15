@@ -87,3 +87,9 @@ frontend/              Vite React（本机 5173）
 frontend/.env.example  可选：自定义后端地址（一般留空）
 启动系统.bat / 关闭系统.bat
 ```
+##日志
+10.16：
+新增加好友功能
+管理员功能优化升级
+
+
