@@ -40,6 +40,7 @@ const RELATIONS = ['配偶', '子女', '父母', '兄弟姐妹', '其他家人']
 
 export default function LinkedInfo() {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [tab, setTab] = useState<Tab>('family')
   const [error, setError] = useState('')
 
@@ -340,9 +341,11 @@ export default function LinkedInfo() {
       {tab === 'course' && (
         <>
           <section>
-            <h3 className="section-label">已开通课程</h3>
+            <h3 className="section-label">
+              {isAdmin ? '全部课程（管理员免费开放）' : '已开通课程'}
+            </h3>
             {courses.length === 0 ? (
-              <p className="muted">暂无已开通课程</p>
+              <p className="muted">{isAdmin ? '暂无课程' : '暂无已开通课程'}</p>
             ) : (
               <ul className="list-card">
                 {courses.map((c) => (
@@ -354,7 +357,11 @@ export default function LinkedInfo() {
                       <h3>{c.name}</h3>
                       <p className="meta">
                         {c.semester}
-                        {typeof c.price === 'number' ? ` · ¥${c.price.toFixed(2)}` : ''}
+                        {isAdmin
+                          ? ' · 免费'
+                          : typeof c.price === 'number'
+                            ? ` · ¥${c.price.toFixed(2)}`
+                            : ''}
                       </p>
                     </Link>
                   </li>
@@ -364,7 +371,9 @@ export default function LinkedInfo() {
           </section>
           <section>
             <h3 className="section-label">购买记录</h3>
-            {purchases.length === 0 ? (
+            {isAdmin ? (
+              <p className="muted">管理员免费开放，无需购买记录</p>
+            ) : purchases.length === 0 ? (
               <p className="muted">暂无购买记录</p>
             ) : (
               <ul className="list-card">

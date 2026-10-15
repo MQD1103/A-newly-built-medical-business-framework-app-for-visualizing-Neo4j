@@ -1472,6 +1472,11 @@ textarea:focus {
   color: #c45c26;
 }
 
+/* 管理员：价格位显示「免费」，用绿色表达「开放」而不是「要付钱」 */
+.course-price-lg.is-free {
+  color: #1f7a4c;
+}
+
 .course-buy-box {
   margin-top: 14px;
   display: flex;

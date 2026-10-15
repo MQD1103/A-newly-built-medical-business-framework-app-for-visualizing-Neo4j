@@ -3,12 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import type { ServiceProduct } from '../types'
-import { mediaUrl } from '../utils'
+import { formatPrice, mediaUrl, priceText } from '../utils'
 
-function formatPrice(n: number | undefined) {
-  const v = Number.isFinite(n) ? Number(n) : 9.9
-  return `¥${v.toFixed(2)}`
-}
+/** 服务价格兜底值，与后端 service_products.py 的默认售价保持一致 */
+const PRICE_FALLBACK = 9.9
 
 function Cover({ src, alt }: { src?: string; alt: string }) {
   if (src) {
@@ -71,7 +69,7 @@ export default function ServiceShop() {
   async function onPurchase() {
     if (!active || active.owned || isAdmin) return
     const ok = confirm(
-      `确认支付 ${formatPrice(active.price)} 购买「${active.name}」？\n（当前为模拟支付，确认即开通）`,
+      `确认支付 ${formatPrice(active.price, PRICE_FALLBACK)} 购买「${active.name}」？\n（当前为模拟支付，确认即开通）`,
     )
     if (!ok) return
     setBuying(true)
@@ -107,7 +105,9 @@ export default function ServiceShop() {
       <div className="page-title">
         <div>
           <h1>服务</h1>
-          <p className="sub">健康服务售卖 · 标价见详情</p>
+          <p className="sub">
+            {isAdmin ? '健康服务 · 管理员免费开放' : '健康服务售卖 · 标价见详情'}
+          </p>
         </div>
       </div>
 
@@ -125,14 +125,16 @@ export default function ServiceShop() {
               >
                 <div className="course-card-cover">
                   <Cover src={s.cover_url} alt={s.name} />
-                  <span className="course-card-price">{formatPrice(s.price)}</span>
+                  <span className="course-card-price">
+                    {priceText(s.price, isAdmin, PRICE_FALLBACK)}
+                  </span>
                 </div>
                 <div className="course-card-body">
                   <strong>{s.name}</strong>
                   <p className="meta">
                     {s.category}
                     {s.unit_label ? ` · ${s.unit_label}` : ''}
-                    {s.owned ? ' · 已开通' : ''}
+                    {isAdmin ? ' · 免费开放' : s.owned ? ' · 已开通' : ''}
                   </p>
                 </div>
               </button>
@@ -145,11 +147,13 @@ export default function ServiceShop() {
                 <Cover src={active.cover_url} alt={active.name} />
               </div>
               <h2>{active.name}</h2>
-              <p className="course-price-lg">{formatPrice(active.price)}</p>
+              <p className={`course-price-lg${isAdmin ? ' is-free' : ''}`}>
+                {priceText(active.price, isAdmin, PRICE_FALLBACK)}
+              </p>
               <p className="meta">
                 {active.category}
                 {active.unit_label ? ` · ${active.unit_label}` : ''}
-                {active.owned ? ' · 已开通' : ' · 未开通'}
+                {isAdmin ? ' · 免费开放' : active.owned ? ' · 已开通' : ' · 未开通'}
               </p>
               {active.description ? (
                 <p style={{ margin: '10px 0 0' }}>{active.description}</p>
@@ -161,7 +165,7 @@ export default function ServiceShop() {
 
               {active.owned || isAdmin ? (
                 <p className="ok-tip" style={{ marginTop: 12 }}>
-                  {isAdmin ? '管理员可查看全部服务' : '该服务已开通'}
+                  {isAdmin ? '管理员免费开放，无需购买' : '该服务已开通'}
                 </p>
               ) : (
                 <div className="course-buy-box">
@@ -171,7 +175,7 @@ export default function ServiceShop() {
                     disabled={buying}
                     onClick={() => void onPurchase()}
                   >
-                    {buying ? '支付中…' : `支付 ${formatPrice(active.price)} 开通`}
+                    {buying ? '支付中…' : `支付 ${formatPrice(active.price, PRICE_FALLBACK)} 开通`}
                   </button>
                   <p className="meta">模拟支付：确认后立即开通，后续可接真实支付通道</p>
                 </div>

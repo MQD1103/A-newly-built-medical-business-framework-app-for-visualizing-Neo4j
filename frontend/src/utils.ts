@@ -47,3 +47,19 @@ export function audienceLabel(a: string): string {
   if (a === 'teacher') return '管理'
   return a
 }
+
+export const FREE_LABEL = '免费'
+
+/** 价格文案（元）。价格缺失时退回该域内的默认价 */
+export function formatPrice(n: number | undefined, fallback: number): string {
+  const v = Number.isFinite(n) ? Number(n) : fallback
+  return `¥${v.toFixed(2)}`
+}
+
+/**
+ * 价格位文案：管理员全部功能免费开放，一律显示「免费」，
+ * 其他角色照常显示金额。
+ */
+export function priceText(n: number | undefined, isAdmin: boolean, fallback: number): string {
+  return isAdmin ? FREE_LABEL : formatPrice(n, fallback)
+}

@@ -3,12 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import type { Course, ScheduleSlot } from '../types'
-import { mediaUrl, weekdayLabel } from '../utils'
+import { formatPrice, mediaUrl, priceText, weekdayLabel } from '../utils'
 
-function formatPrice(n: number | undefined) {
-  const v = Number.isFinite(n) ? Number(n) : 2.99
-  return `¥${v.toFixed(2)}`
-}
+/** 课程价格兜底值，与后端 courses.py 的默认售价保持一致 */
+const PRICE_FALLBACK = 2.99
 
 function Cover({ src, alt }: { src?: string; alt: string }) {
   if (src) {
@@ -88,7 +86,7 @@ export default function Courses() {
   async function onPurchase() {
     if (!active || active.enrolled || isAdmin) return
     const ok = confirm(
-      `确认支付 ${formatPrice(active.price)} 购买「${active.name}」？\n（当前为模拟支付，确认即开通）`,
+      `确认支付 ${formatPrice(active.price, PRICE_FALLBACK)} 购买「${active.name}」？\n（当前为模拟支付，确认即开通）`,
     )
     if (!ok) return
     setBuying(true)
@@ -128,7 +126,9 @@ export default function Courses() {
       <div className="page-title">
         <div>
           <h1>课程</h1>
-          <p className="sub">COPD 系列售课 · 标价见详情</p>
+          <p className="sub">
+            {isAdmin ? 'COPD 系列课程 · 管理员免费开放' : 'COPD 系列售课 · 标价见详情'}
+          </p>
         </div>
       </div>
 
@@ -146,13 +146,15 @@ export default function Courses() {
               >
                 <div className="course-card-cover">
                   <Cover src={c.cover_url} alt={c.name} />
-                  <span className="course-card-price">{formatPrice(c.price)}</span>
+                  <span className="course-card-price">
+                    {priceText(c.price, isAdmin, PRICE_FALLBACK)}
+                  </span>
                 </div>
                 <div className="course-card-body">
                   <strong>{c.name}</strong>
                   <p className="meta">
                     {c.semester}
-                    {c.enrolled ? ' · 已开通' : ''}
+                    {isAdmin ? ' · 免费开放' : c.enrolled ? ' · 已开通' : ''}
                   </p>
                 </div>
               </button>
@@ -165,11 +167,13 @@ export default function Courses() {
                 <Cover src={active.cover_url} alt={active.name} />
               </div>
               <h2>{active.name}</h2>
-              <p className="course-price-lg">{formatPrice(active.price)}</p>
+              <p className={`course-price-lg${isAdmin ? ' is-free' : ''}`}>
+                {priceText(active.price, isAdmin, PRICE_FALLBACK)}
+              </p>
               <p className="meta">
                 {active.semester}
                 {active.teacher_name ? ` · ${active.teacher_name}` : ''}
-                {active.enrolled ? ' · 已开通' : ' · 未开通'}
+                {isAdmin ? ' · 免费开放' : active.enrolled ? ' · 已开通' : ' · 未开通'}
               </p>
               {active.description ? (
                 <p style={{ margin: '10px 0 0' }}>{active.description}</p>
@@ -180,11 +184,14 @@ export default function Courses() {
               )}
 
               {active.enrolled || isAdmin ? (
-                <div className="course-quick-links">
-                  <Link to={`/materials?course_id=${active.id}`}>资料</Link>
-                  <Link to={`/scores?course_id=${active.id}`}>成绩</Link>
-                  <Link to={`/schedule?course_id=${active.id}`}>课表</Link>
-                </div>
+                <>
+                  <div className="course-quick-links">
+                    <Link to={`/materials?course_id=${active.id}`}>资料</Link>
+                    <Link to={`/scores?course_id=${active.id}`}>成绩</Link>
+                    <Link to={`/schedule?course_id=${active.id}`}>课表</Link>
+                  </div>
+                  {isAdmin ? <p className="ok-tip">管理员免费开放，无需购买</p> : null}
+                </>
               ) : (
                 <div className="course-buy-box">
                   <button
@@ -193,7 +200,7 @@ export default function Courses() {
                     disabled={buying}
                     onClick={() => void onPurchase()}
                   >
-                    {buying ? '支付中…' : `支付 ${formatPrice(active.price)} 开通`}
+                    {buying ? '支付中…' : `支付 ${formatPrice(active.price, PRICE_FALLBACK)} 开通`}
                   </button>
                   <p className="meta">模拟支付：确认后立即开通，后续可接真实支付通道</p>
                 </div>
