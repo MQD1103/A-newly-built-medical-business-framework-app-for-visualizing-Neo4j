@@ -79,6 +79,18 @@ def ensure_schema() -> None:
                 conn.execute(text("ALTER TABLE reminders_new RENAME TO reminders"))
                 conn.execute(text("PRAGMA foreign_keys=ON"))
 
+        # 管理员为指定用户下发的提醒（可空；必须放在上面重建表之后，
+        # 因为重建分支用的是固定列清单，会建出不带该列的新表）
+        rem_cols = {c["name"] for c in insp.get_columns("reminders")}
+        if "target_user_id" not in rem_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE reminders ADD COLUMN target_user_id INTEGER "
+                        "REFERENCES users(id)"
+                    )
+                )
+
     if "community_posts" in tables:
         post_cols = {c["name"] for c in insp.get_columns("community_posts")}
         if "image_urls" not in post_cols:

@@ -1160,6 +1160,11 @@ textarea:focus {
   cursor: pointer;
 }
 
+/* 非破坏性的行内操作（如「免费开通」），与红色的删除区分开 */
+.linkish.primary {
+  color: var(--blue-deep);
+}
+
 .ext-link {
   display: inline-flex;
   margin-top: 8px;
@@ -1665,6 +1670,18 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+  /* 问候语可以省略，右侧按钮永远不被挤出边框（管理员多一个「用户」入口时尤其明显） */
+  min-width: 0;
+}
+
+.neo-brand > div {
+  min-width: 0;
+}
+
+.neo-brand > div em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .neo-dot {
@@ -1692,6 +1709,7 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .neo-crumb {
@@ -2913,4 +2931,80 @@ textarea:focus {
     border: 0;
     box-shadow: none;
   }
+}
+
+/* ---------- 身份切换横幅（管理员「以此用户身份进入」）---------- */
+.impersonate-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(90deg, #fff4e3, #ffe9cf);
+  border-bottom: 1px solid rgba(196, 120, 38, 0.28);
+  color: #8a4b12;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.impersonate-text {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.impersonate-exit {
+  border: 1px solid rgba(196, 120, 38, 0.45);
+  background: #fff;
+  color: #8a4b12;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.impersonate-exit:active {
+  transform: scale(0.96);
+}
+
+/* ---------- 管理员代办页 ---------- */
+.admin-user-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-head strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* 代办页每一行：左标题 + 右状态/操作 */
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border: 0;
+  box-shadow: none;
+  flex-wrap: wrap;
+}
+
+.admin-row .row-actions {
+  margin-top: 0;
+  align-items: center;
 }

@@ -648,6 +648,7 @@ function resolveCollisionsWith(
 
 export default function Home() {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const navigate = useNavigate()
   const stageRef = useRef<HTMLDivElement>(null)
   const nodesRef = useRef<NodeDef[]>([])
@@ -1626,6 +1627,17 @@ export default function Home() {
           </div>
         </div>
         <div className="neo-bar-actions">
+          {/* 管理员专属入口：替其它用户开通课程/服务、下发监督提醒 */}
+          {isAdmin && (
+            <button
+              type="button"
+              className="neo-chip"
+              onClick={() => navigate('/admin-user')}
+              title="替其它用户代办课程、服务与监督提醒"
+            >
+              用户
+            </button>
+          )}
           {path.length > 1 && (
             <button type="button" className="neo-chip ghost" onClick={goBackLayer}>
               返回

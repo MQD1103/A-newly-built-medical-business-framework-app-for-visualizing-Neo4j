@@ -12,6 +12,8 @@ interface PurchaseRow {
   course_id: number
   course_name: string
   amount: number
+  /** admin = 管理员代为开通（¥0）；mock = 用户自己模拟支付 */
+  channel?: string
   status: string
   created_at: string
 }
@@ -382,8 +384,12 @@ export default function LinkedInfo() {
                     <h3>{p.course_name}</h3>
                     <p className="meta">
                       ¥{Number(p.amount).toFixed(2)} ·{' '}
-                      {p.status === 'paid' ? '已支付' : p.status} ·{' '}
-                      {formatDateTime(p.created_at)}
+                      {p.channel === 'admin'
+                        ? '管理员开通'
+                        : p.status === 'paid'
+                          ? '已支付'
+                          : p.status}{' '}
+                      · {formatDateTime(p.created_at)}
                     </p>
                   </li>
                 ))}

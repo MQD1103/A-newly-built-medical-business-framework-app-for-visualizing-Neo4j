@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth'
 
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
@@ -10,8 +11,11 @@ const tabs = [
 
 export default function Layout() {
   const { pathname } = useLocation()
+  const { user, impersonating, stopImpersonating } = useAuth()
   const hideTab =
-    pathname.startsWith('/notices/') || pathname.startsWith('/manage')
+    pathname.startsWith('/notices/') ||
+    pathname.startsWith('/manage') ||
+    pathname.startsWith('/admin-user')
 
   const mallActive =
     pathname.startsWith('/mall') ||
@@ -30,6 +34,21 @@ export default function Layout() {
   return (
     <div className="phone-stage">
       <div className={`app-frame${hideTab ? ' no-tab' : ''}`}>
+        {/* 身份切换横幅：与 hideTab 无关，任何页面都要能看到并退出 */}
+        {impersonating && (
+          <div className="impersonate-bar">
+            <span className="impersonate-text">
+              正在以「{user?.full_name ?? '该用户'}」的身份操作
+            </span>
+            <button
+              type="button"
+              className="impersonate-exit"
+              onClick={() => void stopImpersonating()}
+            >
+              退出切换
+            </button>
+          </div>
+        )}
         <main className="app-main">
           <Outlet />
         </main>

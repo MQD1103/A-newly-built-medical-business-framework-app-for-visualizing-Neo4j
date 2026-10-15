@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import Layout from './components/Layout'
+import AdminUser from './pages/AdminUser'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
 import Home from './pages/Home'
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="scores" element={<Scores />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="manage" element={<Manage />} />
+        <Route path="admin-user" element={<AdminUser />} />
         <Route path="profile" element={<ProfileEdit />} />
         <Route path="linked" element={<LinkedInfo />} />
         <Route path="me" element={<Me />} />

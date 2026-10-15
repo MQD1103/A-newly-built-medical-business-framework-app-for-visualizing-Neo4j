@@ -51,6 +51,8 @@ export interface Reminder {
   due_at: string
   external_url: string
   creator_id: number
+  /** 管理员点名下发给某个用户时才有值 */
+  target_user_id?: number | null
   created_at: string
   status: 'pending' | 'overdue'
   source?: 'user' | 'manager' | 'system'
@@ -93,6 +95,14 @@ export interface CourseMaterial {
   creator_id: number
   created_at: string
   can_delete: boolean
+}
+
+/** 管理员代办页的一次性数据（routers/admin.py 的 overview） */
+export interface AdminOverview {
+  user: User
+  courses: Course[]
+  services: ServiceProduct[]
+  reminders: Reminder[]
 }
 
 export interface GradeItem {

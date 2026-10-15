@@ -31,7 +31,10 @@ class User(Base):
     taught_courses: Mapped[list["Course"]] = relationship(back_populates="teacher")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
     notices: Mapped[list["Notice"]] = relationship(back_populates="author")
-    reminders: Mapped[list["Reminder"]] = relationship(back_populates="creator")
+    # reminders 到 users 有两条外键（creator_id / target_user_id），必须显式指定
+    reminders: Mapped[list["Reminder"]] = relationship(
+        back_populates="creator", foreign_keys="Reminder.creator_id"
+    )
 
 
 class Course(Base):
@@ -160,12 +163,18 @@ class Reminder(Base):
     due_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     external_url: Mapped[str] = mapped_column(String(500), default="")
     creator_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    # 管理员为指定用户下发的提醒；空表示按课程/创建者可见性推导
+    target_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True, default=None
+    )
     # user=个人添加；manager=教师/管理员；system=系统种子
     source: Mapped[str] = mapped_column(String(20), default="manager", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped[Course] = relationship(back_populates="reminders")
-    creator: Mapped[User] = relationship(back_populates="reminders")
+    creator: Mapped[User] = relationship(
+        back_populates="reminders", foreign_keys=[creator_id]
+    )
     prefs: Mapped[list["ReminderPreference"]] = relationship(back_populates="reminder")
 
 

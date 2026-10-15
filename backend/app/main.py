@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .database import Base, SessionLocal, engine
 from .routers import (
+    admin,
     auth,
     community,
     courses,
@@ -67,6 +68,7 @@ app.include_router(materials.router)
 app.include_router(grades.router)
 app.include_router(links.router)
 app.include_router(home.router)
+app.include_router(admin.router)
 
 
 @app.get("/api/health")

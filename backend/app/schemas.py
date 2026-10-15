@@ -164,6 +164,8 @@ class ReminderOut(BaseModel):
     due_at: datetime
     external_url: str
     creator_id: int
+    # 管理员指定下发给某个用户的提醒；普通提醒为空
+    target_user_id: int | None = None
     created_at: datetime
     status: str = "pending"  # pending / overdue
     source: str = "manager"  # user / manager / system
@@ -352,3 +354,52 @@ class HospitalLinkOut(BaseModel):
     address: str = ""
     note: str = ""
     created_at: datetime
+
+
+# ---------- 管理员代办（routers/admin.py）----------
+
+
+class AdminCourseGrant(BaseModel):
+    course_id: int
+
+
+class AdminServiceGrant(BaseModel):
+    service_id: int
+
+
+class AdminUserUpdate(BaseModel):
+    """管理员改他人资料：不需要旧密码。"""
+
+    full_name: str | None = Field(default=None, min_length=1, max_length=100)
+    new_password: str | None = Field(default=None, min_length=4, max_length=100)
+
+
+class AdminReminderCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    content: str = ""
+    due_at: datetime
+    external_url: str = ""
+
+
+class AdminReminderUpdate(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    due_at: datetime | None = None
+    external_url: str | None = None
+
+
+class AdminOverviewOut(BaseModel):
+    user: UserOut
+    courses: list[CourseOut] = Field(default_factory=list)
+    services: list[ServiceProductOut] = Field(default_factory=list)
+    reminders: list[ReminderOut] = Field(default_factory=list)
+
+
+class ImpersonateIn(BaseModel):
+    user_id: int
+
+
+class ImpersonateOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut

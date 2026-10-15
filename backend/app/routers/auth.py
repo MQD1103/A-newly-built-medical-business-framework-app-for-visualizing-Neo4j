@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -6,9 +7,20 @@ from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, hash_password, verify_password
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_roles
 from ..models import User
-from ..schemas import AvatarPreviewOut, LoginRequest, ProfileUpdate, Token, UserOut
+from ..schemas import (
+    AvatarPreviewOut,
+    ImpersonateIn,
+    ImpersonateOut,
+    LoginRequest,
+    ProfileUpdate,
+    Token,
+    UserOut,
+)
+
+# 「以此用户身份进入」的令牌有效期（比正常登录短）
+IMPERSONATE_MINUTES = 120
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -26,6 +38,32 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         )
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return Token(access_token=token)
+
+
+@router.post("/impersonate", response_model=ImpersonateOut)
+def impersonate(
+    body: ImpersonateIn,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles("admin")),
+):
+    """管理员换用目标用户的身份令牌，用于「以此用户身份进入」。
+
+    现有 get_current_user 只读 JWT 的 sub，所以这个令牌在所有端点下与目标用户
+    自己登录完全等价（creator_id / user_id 都记成目标用户）；act 只是审计预留。
+    """
+    if body.user_id == admin.id:
+        raise HTTPException(status_code=400, detail="当前已是本人身份")
+    target = db.get(User, body.user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if target.role == "admin":
+        raise HTTPException(status_code=400, detail="不能切换为其他管理员身份")
+
+    token = create_access_token(
+        {"sub": str(target.id), "role": target.role, "act": str(admin.id)},
+        expires_delta=timedelta(minutes=IMPERSONATE_MINUTES),
+    )
+    return ImpersonateOut(access_token=token, user=UserOut.model_validate(target))
 
 
 @router.get("/me", response_model=UserOut)

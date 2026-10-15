@@ -53,6 +53,7 @@ def to_out(r: Reminder, user: User, db: Session) -> ReminderOut:
         due_at=r.due_at,
         external_url=r.external_url or "",
         creator_id=r.creator_id,
+        target_user_id=r.target_user_id,
         created_at=r.created_at,
         status=reminder_status(r.due_at),
         source=source,
@@ -82,6 +83,9 @@ def student_enrolled(db: Session, user: User, course_id: int) -> bool:
 def user_can_see(db: Session, user: User, reminder: Reminder) -> bool:
     if reminder.creator_id == user.id:
         return True
+    # 管理员点名下发给本用户的提醒
+    if reminder.target_user_id == user.id:
+        return True
     if user.role == "admin":
         return True
     if user.role == "teacher":
@@ -98,6 +102,8 @@ def list_reminders(
 ):
     q = db.query(Reminder)
     own = (Reminder.creator_id == user.id)
+    # 管理员点名下发给自己 → 无论课程归属都可见
+    mine = (Reminder.target_user_id == user.id)
     if user.role == "admin":
         pass
     elif user.role == "student":
@@ -106,17 +112,17 @@ def list_reminders(
             for e in db.query(Enrollment).filter(Enrollment.student_id == user.id).all()
         ]
         if course_ids:
-            q = q.filter(or_(own, Reminder.course_id.in_(course_ids)))
+            q = q.filter(or_(own, mine, Reminder.course_id.in_(course_ids)))
         else:
-            q = q.filter(own)
+            q = q.filter(or_(own, mine))
     elif user.role == "teacher":
         course_ids = [
             c.id for c in db.query(Course).filter(Course.teacher_id == user.id).all()
         ]
         if course_ids:
-            q = q.filter(or_(own, Reminder.course_id.in_(course_ids)))
+            q = q.filter(or_(own, mine, Reminder.course_id.in_(course_ids)))
         else:
-            q = q.filter(own)
+            q = q.filter(or_(own, mine))
     items = q.order_by(Reminder.due_at.asc()).all()
     return [to_out(r, user, db) for r in items]
 
