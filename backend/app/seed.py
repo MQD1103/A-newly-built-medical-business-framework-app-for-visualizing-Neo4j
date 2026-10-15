@@ -100,6 +100,10 @@ LEGACY_CAMPUS_COURSE_NAMES = {"高等数学A", "大学英语III", "计算机网�
 
 STUDENT_DEMO_AVATAR = "/uploads/avatars/s2024001.jpg"
 
+# 第二个管理员账号（协作演示用），新库和已有库都会补上
+EXTRA_ADMIN_USERNAME = "jz12345"
+EXTRA_ADMIN_PASSWORD = "12345"
+
 
 def ensure_demo_avatars(db: Session) -> None:
     """保证演示学生已挂上头像（已有库也会补）。"""
@@ -357,6 +361,22 @@ def ensure_copd_courses(db: Session) -> None:
     db.commit()
 
 
+def ensure_extra_admin(db: Session) -> None:
+    """确保协作演示用的第二个管理员账号（jz12345）存在。"""
+    if db.query(User).filter(User.username == EXTRA_ADMIN_USERNAME).first():
+        return
+    db.add(
+        User(
+            username=EXTRA_ADMIN_USERNAME,
+            password_hash=hash_password(EXTRA_ADMIN_PASSWORD),
+            full_name=EXTRA_ADMIN_USERNAME,
+            role="admin",
+            avatar_url="",
+        )
+    )
+    db.commit()
+
+
 def seed_if_empty(db: Session) -> None:
     if db.query(User).first():
         ensure_copd_courses(db)
@@ -364,6 +384,7 @@ def seed_if_empty(db: Session) -> None:
         ensure_demo_urgent_notice(db)
         ensure_demo_materials_grades(db)
         ensure_demo_service_products(db)
+        ensure_extra_admin(db)
         return
 
     admin = User(
@@ -595,3 +616,4 @@ def seed_if_empty(db: Session) -> None:
         )
 
     db.commit()
+    ensure_extra_admin(db)

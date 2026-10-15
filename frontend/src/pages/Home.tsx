@@ -695,7 +695,6 @@ export default function Home() {
   const [seekFocusId, setSeekFocusId] = useState<string | null>(null)
   const [primarySettle, setPrimarySettle] = useState(false)
   const [infoCardId, setInfoCardId] = useState<string | null>(null)
-  const [homeSnap, setHomeSnap] = useState<HomeData | null>(null)
   /** 第一层浮动提醒（未到期）；到期后先消散再移除 */
   const [floatReminders, setFloatReminders] = useState<Reminder[]>([])
   const [vanishingRemIds, setVanishingRemIds] = useState<string[]>([])
@@ -1171,13 +1170,9 @@ export default function Home() {
   }
 
   async function ensureHomeSnap() {
-    if (homeCache.current) {
-      setHomeSnap(homeCache.current)
-      return homeCache.current
-    }
+    if (homeCache.current) return homeCache.current
     const data = await api<HomeData>('/api/home')
     homeCache.current = data
-    setHomeSnap(data)
     return data
   }
 
@@ -1257,7 +1252,6 @@ export default function Home() {
         slots = await api<ScheduleSlot[]>('/api/schedule/today')
         const merged = { ...data, today_slots: slots }
         homeCache.current = merged
-        setHomeSnap(merged)
       }
     } catch {
       try {
