@@ -7,6 +7,7 @@ $Frontend = Join-Path $Root 'frontend'
 $VenvPython = Join-Path $Backend '.venv\Scripts\python.exe'
 $VenvDir = Join-Path $Backend '.venv'
 $NodeModules = Join-Path $Frontend 'node_modules'
+$PipMirror = 'https://pypi.tuna.tsinghua.edu.cn/simple'
 $BackendHost = '127.0.0.1'
 $BackendPort = 8000
 $FrontendHost = '127.0.0.1'
@@ -66,8 +67,8 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     Write-Host '[错误] 虚拟环境创建失败。' -ForegroundColor Red
     exit 1
   }
-  & $VenvPython -m pip install --upgrade pip
-  & $VenvPython -m pip install -r (Join-Path $Backend 'requirements.txt')
+  & $VenvPython -m pip install --upgrade pip -i $PipMirror
+  & $VenvPython -m pip install -r (Join-Path $Backend 'requirements.txt') -i $PipMirror --timeout 60 --retries 5
   Write-Host '[成功] 后端依赖已安装。' -ForegroundColor Green
 }
 
