@@ -335,3 +335,47 @@ class HospitalLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped[User] = relationship()
+
+
+class FriendRequest(Base):
+    """好友关系：一行代表一对用户。
+
+    pending = 待对方验证，accepted = 已是好友。
+    用 user_low_id < user_high_id 的规范化写法，配合唯一约束保证
+    「同一对用户只有一行」，方向由 requester_id 表达。
+    """
+
+    __tablename__ = "friend_requests"
+    __table_args__ = (
+        UniqueConstraint("user_low_id", "user_high_id", name="uq_friend_pair"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    # 规范化的一对用户：low < high
+    user_low_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    user_high_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # 发起方（low / high 之一），决定申请出现在谁的「待处理」里
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # 同意时间（含反向申请时的自动同意）；删除好友整行删掉
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, default=None
+    )
+
+
+class FriendMessage(Base):
+    """好友私信。read_at 为空表示收件人未读（用于未读红点）。"""
+
+    __tablename__ = "friend_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, default=None, index=True
+    )

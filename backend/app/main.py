@@ -11,6 +11,7 @@ from .routers import (
     auth,
     community,
     courses,
+    friends,
     grades,
     home,
     links,
@@ -64,6 +65,7 @@ app.include_router(service_products.router)
 app.include_router(reminders.router)
 app.include_router(schedule.router)
 app.include_router(community.router)
+app.include_router(friends.router)
 app.include_router(materials.router)
 app.include_router(grades.router)
 app.include_router(links.router)

@@ -5,6 +5,7 @@ import Layout from './components/Layout'
 import AdminUser from './pages/AdminUser'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
+import Friends from './pages/Friends'
 import Home from './pages/Home'
 import LinkedInfo from './pages/LinkedInfo'
 import Login from './pages/Login'
@@ -54,6 +55,7 @@ export default function App() {
         <Route path="notices/:id" element={<NoticeDetail />} />
         <Route path="reminders" element={<Reminders />} />
         <Route path="community" element={<Community />} />
+        <Route path="friends" element={<Friends />} />
         <Route path="mall" element={<Mall />} />
         <Route path="services" element={<Services />} />
         <Route path="courses" element={<Courses />} />

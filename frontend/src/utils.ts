@@ -63,3 +63,14 @@ export function formatPrice(n: number | undefined, fallback: number): string {
 export function priceText(n: number | undefined, isAdmin: boolean, fallback: number): string {
   return isAdmin ? FREE_LABEL : formatPrice(n, fallback)
 }
+
+/**
+ * 加好友按钮文案。返回 null 表示不渲染按钮（自己 / 已是好友）。
+ * hasActed 用于刚点过之后的文案，避免重复提交。
+ */
+export function friendActionLabel(state: string, hasActed: boolean): string | null {
+  if (state === 'self' || state === 'friends') return null
+  if (state === 'pending_in') return hasActed ? '已同意' : '同意'
+  if (state === 'pending_out') return hasActed ? '已发送申请' : '待验证'
+  return hasActed ? '已发送申请' : '加好友'
+}

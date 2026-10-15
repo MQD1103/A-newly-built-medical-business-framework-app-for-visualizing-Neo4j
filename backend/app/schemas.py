@@ -304,6 +304,8 @@ class CommunityPostOut(BaseModel):
     author_name: str = ""
     author_role: str = ""
     author_avatar_url: str = ""
+    # 作者与当前用户的好友关系：self/none/pending_out/pending_in/friends
+    author_friend_state: str = "none"
     content: str
     image_urls: list[str] = Field(default_factory=list)
     created_at: datetime
@@ -403,3 +405,61 @@ class ImpersonateOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+# ---------- 好友（routers/friends.py）----------
+
+
+class FriendRequestCreate(BaseModel):
+    user_id: int
+
+
+class FriendUserOut(BaseModel):
+    """好友 / 申请人 / 搜索结果的统一用户视图。"""
+
+    user_id: int
+    username: str = ""
+    full_name: str = ""
+    role: str = ""
+    avatar_url: str = ""
+    # self/none/pending_out/pending_in/friends
+    friend_state: str = "none"
+
+
+class FriendOut(FriendUserOut):
+    last_message: str = ""
+    last_message_at: datetime | None = None
+    unread_count: int = 0
+
+
+class FriendRequestOut(FriendUserOut):
+    request_id: int
+    created_at: datetime
+    # incoming = 待我处理，outgoing = 我发出的
+    direction: str = "incoming"
+
+
+class FriendRequestResultOut(BaseModel):
+    request_id: int | None = None
+    user_id: int
+    status: str  # pending / accepted
+    auto_accepted: bool = False
+
+
+class FriendSummaryOut(BaseModel):
+    pending_requests: int = 0
+    unread_messages: int = 0
+    total: int = 0
+
+
+class FriendMessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+
+
+class FriendMessageOut(BaseModel):
+    id: int
+    sender_id: int
+    recipient_id: int
+    content: str
+    created_at: datetime
+    mine: bool = False

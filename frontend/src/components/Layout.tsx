@@ -15,7 +15,9 @@ export default function Layout() {
   const hideTab =
     pathname.startsWith('/notices/') ||
     pathname.startsWith('/manage') ||
-    pathname.startsWith('/admin-user')
+    pathname.startsWith('/admin-user') ||
+    // 好友页：私信输入框要贴底，底栏会把它顶起来
+    pathname.startsWith('/friends')
 
   const mallActive =
     pathname.startsWith('/mall') ||

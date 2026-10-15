@@ -118,3 +118,51 @@ export interface GradeItem {
   created_at: string
   can_delete: boolean
 }
+
+// ---------- 好友（routers/friends.py）----------
+
+export type FriendState = 'self' | 'none' | 'pending_out' | 'pending_in' | 'friends'
+
+/** 好友 / 申请人 / 搜索结果的统一用户视图 */
+export interface FriendUser {
+  user_id: number
+  username: string
+  full_name: string
+  role: Role
+  avatar_url: string
+  friend_state: FriendState
+}
+
+export interface Friend extends FriendUser {
+  last_message: string
+  last_message_at: string | null
+  unread_count: number
+}
+
+export interface FriendRequestItem extends FriendUser {
+  request_id: number
+  created_at: string
+  direction: 'incoming' | 'outgoing'
+}
+
+export interface FriendMessage {
+  id: number
+  sender_id: number
+  recipient_id: number
+  content: string
+  created_at: string
+  mine: boolean
+}
+
+export interface FriendSummary {
+  pending_requests: number
+  unread_messages: number
+  total: number
+}
+
+export interface FriendActionResult {
+  request_id: number | null
+  user_id: number
+  status: 'pending' | 'accepted'
+  auto_accepted: boolean
+}

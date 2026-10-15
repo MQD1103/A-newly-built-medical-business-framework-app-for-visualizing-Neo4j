@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, apiUpload } from '../api'
 import { useAuth } from '../auth'
-import { formatDateTime, mediaUrl, roleLabel } from '../utils'
+import type { FriendActionResult, FriendState, FriendSummary } from '../types'
+import { formatDateTime, friendActionLabel, mediaUrl, roleLabel } from '../utils'
 
 interface OriginalPost {
   id: number
@@ -16,6 +18,7 @@ interface CommunityPost {
   author_name: string
   author_role: string
   author_avatar_url?: string
+  author_friend_state: FriendState
   content: string
   image_urls: string[]
   created_at: string
@@ -43,9 +46,20 @@ const MAX_IMAGES = 9
 
 export default function Community() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const [items, setItems] = useState<CommunityPost[]>([])
+  // error 只用于首屏加载失败（会把整页换成错误屏）；其余操作用下面的行内提示
   const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [tip, setTip] = useState('')
+  const [scope, setScope] = useState<'all' | 'friends'>('all')
+  const [counts, setCounts] = useState<FriendSummary>({
+    pending_requests: 0,
+    unread_messages: 0,
+    total: 0,
+  })
+  const [actedAuthors, setActedAuthors] = useState<Set<number>>(new Set())
   const [showForm, setShowForm] = useState(false)
   const [content, setContent] = useState('')
   const [imageUrls, setImageUrls] = useState<string[]>([])
@@ -64,14 +78,26 @@ export default function Community() {
 
   async function load() {
     try {
-      setItems(await api<CommunityPost[]>('/api/community/posts'))
+      setItems(await api<CommunityPost[]>(`/api/community/posts?scope=${scope}`))
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败')
     }
   }
 
+  async function loadSummary() {
+    try {
+      setCounts(await api<FriendSummary>('/api/friends/summary'))
+    } catch {
+      // 红点失败不能走 error，否则整页被错误屏替换
+    }
+  }
+
   useEffect(() => {
     void load()
+  }, [scope])
+
+  useEffect(() => {
+    void loadSummary()
   }, [])
 
   useEffect(() => {
@@ -100,7 +126,7 @@ export default function Community() {
     if (!files?.length) return
     const remain = MAX_IMAGES - imageUrls.length
     if (remain <= 0) {
-      setError(`最多添加 ${MAX_IMAGES} 张照片`)
+      setActionError(`最多添加 ${MAX_IMAGES} 张照片`)
       return
     }
     const list = Array.from(files).slice(0, remain)
@@ -114,7 +140,7 @@ export default function Community() {
       }
       if (uploaded.length) setImageUrls((prev) => [...prev, ...uploaded])
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败')
+      setActionError(err instanceof Error ? err.message : '上传失败')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -129,7 +155,7 @@ export default function Community() {
     e.preventDefault()
     const text = content.trim()
     if (!text && imageUrls.length === 0) {
-      setError('请填写文字或添加照片')
+      setActionError('请填写文字或添加照片')
       return
     }
     setSubmitting(true)
@@ -143,7 +169,7 @@ export default function Community() {
       setShowForm(false)
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '发布失败')
+      setActionError(err instanceof Error ? err.message : '发布失败')
     } finally {
       setSubmitting(false)
     }
@@ -155,7 +181,7 @@ export default function Community() {
       await api(`/api/community/posts/${id}`, { method: 'DELETE' })
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败')
+      setActionError(err instanceof Error ? err.message : '删除失败')
     }
   }
 
@@ -166,7 +192,7 @@ export default function Community() {
       })
       setItems((prev) => prev.map((x) => (x.id === p.id ? updated : x)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      setActionError(err instanceof Error ? err.message : '操作失败')
     }
   }
 
@@ -178,7 +204,7 @@ export default function Community() {
       )
       setComments((prev) => ({ ...prev, [postId]: list }))
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载评论失败')
+      setActionError(err instanceof Error ? err.message : '加载评论失败')
     } finally {
       setCommentLoading(false)
     }
@@ -212,7 +238,7 @@ export default function Community() {
         ),
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : '评论失败')
+      setActionError(err instanceof Error ? err.message : '评论失败')
     }
   }
 
@@ -232,7 +258,7 @@ export default function Community() {
         ),
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败')
+      setActionError(err instanceof Error ? err.message : '删除失败')
     }
   }
 
@@ -248,9 +274,34 @@ export default function Community() {
       setRepostText('')
       await load()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '转发失败')
+      setActionError(err instanceof Error ? err.message : '转发失败')
     } finally {
       setReposting(false)
+    }
+  }
+
+  async function onAddFriend(authorId: number) {
+    setTip('')
+    setActionError('')
+    try {
+      const res = await api<FriendActionResult>('/api/friends/requests', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: authorId }),
+      })
+      const accepted = res.status === 'accepted'
+      setTip(accepted ? '你们已成为好友' : '申请已发送，等待对方同意')
+      setActedAuthors((prev) => new Set(prev).add(authorId))
+      // 同一作者可能有多条动态，按 author_id 一起更新
+      setItems((prev) =>
+        prev.map((x) =>
+          x.author_id === authorId
+            ? { ...x, author_friend_state: accepted ? 'friends' : 'pending_out' }
+            : x,
+        ),
+      )
+      void loadSummary()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '操作失败')
     }
   }
 
@@ -290,16 +341,59 @@ export default function Community() {
           <h1>社区</h1>
           <p className="sub">小医社区 · {user?.full_name}</p>
         </div>
-        <button
-          type="button"
-          className="btn-add"
-          onClick={() => setShowForm((v) => !v)}
-          aria-label={showForm ? '取消发布' : '发布动态'}
-          title={showForm ? '取消' : '发布'}
-        >
-          {showForm ? '×' : '+'}
-        </button>
+        <div className="page-title-actions">
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => navigate('/friends')}
+            title="好友与私信"
+          >
+            好友
+            {counts.total > 0 && <span className="badge danger">{counts.total}</span>}
+          </button>
+          <button
+            type="button"
+            className="btn-add"
+            onClick={() => setShowForm((v) => !v)}
+            aria-label={showForm ? '取消发布' : '发布动态'}
+            title={showForm ? '取消' : '发布'}
+          >
+            {showForm ? '×' : '+'}
+          </button>
+        </div>
       </div>
+
+      <div className="link-tabs two">
+        {(
+          [
+            ['all', '全部'],
+            ['friends', '好友'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`link-tab${scope === key ? ' active' : ''}`}
+            onClick={() => setScope(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {actionError && (
+        <p className="error">
+          {actionError}{' '}
+          <button
+            type="button"
+            className="linkish"
+            onClick={() => setActionError('')}
+          >
+            关闭
+          </button>
+        </p>
+      )}
+      {tip && <p className="ok-tip">{tip}</p>}
 
       {showForm && (
         <form className="form-card" onSubmit={onCreate}>
@@ -380,6 +474,26 @@ export default function Community() {
                   <span className="badge soft">{roleLabel(p.author_role)}</span>
                   {p.original_post_id ? (
                     <span className="badge soft">转发</span>
+                  ) : null}
+                  {p.author_friend_state === 'friends' ? (
+                    <span className="badge soft">已是好友</span>
+                  ) : friendActionLabel(
+                      p.author_friend_state,
+                      actedAuthors.has(p.author_id),
+                    ) ? (
+                    <button
+                      type="button"
+                      className="linkish primary"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void onAddFriend(p.author_id)
+                      }}
+                    >
+                      {friendActionLabel(
+                        p.author_friend_state,
+                        actedAuthors.has(p.author_id),
+                      )}
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -480,7 +594,13 @@ export default function Community() {
           </li>
         ))}
       </ul>
-      {items.length === 0 && <p className="muted">还没有动态，点击右上角 + 发一条吧</p>}
+      {items.length === 0 && (
+        <p className="muted">
+          {scope === 'friends'
+            ? '好友暂无动态，切到「全部」看看，或先去加几个好友'
+            : '还没有动态，点击右上角 + 发一条吧'}
+        </p>
+      )}
 
       {repostId != null && (
         <div className="repost-mask" role="dialog" aria-modal="true">

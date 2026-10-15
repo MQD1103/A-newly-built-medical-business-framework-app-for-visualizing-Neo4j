@@ -3008,3 +3008,99 @@ textarea:focus {
   margin-top: 0;
   align-items: center;
 }
+
+/* ---------- 好友（社区内）---------- */
+
+.page-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* .link-tabs 默认三列，两段筛选用这个修饰类 */
+.link-tabs.two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.friend-row .row-actions {
+  margin-top: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.friend-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.friend-last {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-bubble {
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-bubble.me {
+  align-self: flex-end;
+  background: linear-gradient(180deg, var(--blue), var(--blue-deep));
+  color: #fff;
+  border-bottom-right-radius: 6px;
+}
+
+.chat-bubble.them {
+  align-self: flex-start;
+  background: rgba(91, 163, 245, 0.14);
+  color: var(--ink);
+  border-bottom-left-radius: 6px;
+}
+
+.chat-bubble .chat-time {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.chat-compose {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 45%);
+}
+
+.chat-compose input {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(91, 163, 245, 0.35);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.95);
+}

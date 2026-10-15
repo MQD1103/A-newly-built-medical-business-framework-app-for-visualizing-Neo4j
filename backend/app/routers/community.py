@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -17,6 +18,7 @@ from ..schemas import (
     CommunityPostOut,
     CommunityRepostCreate,
 )
+from .friends import FriendView, friend_view
 
 router = APIRouter(prefix="/api/community", tags=["community"])
 
@@ -78,7 +80,9 @@ def original_out(p: CommunityPost | None) -> CommunityOriginalOut | None:
     )
 
 
-def to_out(p: CommunityPost, user: User, db: Session) -> CommunityPostOut:
+def to_out(
+    p: CommunityPost, user: User, db: Session, view: FriendView
+) -> CommunityPostOut:
     orig = None
     if p.original_post_id:
         src = p.original or db.get(CommunityPost, p.original_post_id)
@@ -89,6 +93,7 @@ def to_out(p: CommunityPost, user: User, db: Session) -> CommunityPostOut:
         author_name=p.author.full_name if p.author else "",
         author_role=p.author.role if p.author else "",
         author_avatar_url=(p.author.avatar_url if p.author else "") or "",
+        author_friend_state=view.state_of(p.author_id),
         content=p.content or "",
         image_urls=parse_images(p.image_urls),
         created_at=p.created_at,
@@ -117,16 +122,18 @@ def comment_to_out(c: CommunityComment, user: User) -> CommunityCommentOut:
 
 @router.get("/posts", response_model=list[CommunityPostOut])
 def list_posts(
+    scope: Literal["all", "friends"] = "all",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    items = (
-        db.query(CommunityPost)
-        .order_by(CommunityPost.created_at.desc())
-        .limit(100)
-        .all()
-    )
-    return [to_out(p, user, db) for p in items]
+    # 关系集合整个请求只查一次（作者状态与「只看好友」共用）
+    view = friend_view(db, user.id)
+    q = db.query(CommunityPost)
+    if scope == "friends":
+        # 含自己：切到好友视图时自己的新动态不该消失
+        q = q.filter(CommunityPost.author_id.in_(view.friends | {user.id}))
+    items = q.order_by(CommunityPost.created_at.desc()).limit(100).all()
+    return [to_out(p, user, db, view) for p in items]
 
 
 @router.post("/upload", response_model=CommunityImageOut)
@@ -173,7 +180,7 @@ def create_post(
     db.add(post)
     db.commit()
     db.refresh(post)
-    return to_out(post, user, db)
+    return to_out(post, user, db, friend_view(db, user.id))
 
 
 @router.post("/posts/{post_id}/like", response_model=CommunityPostOut)
@@ -196,7 +203,7 @@ def toggle_like(
         db.add(CommunityLike(post_id=post_id, user_id=user.id))
     db.commit()
     db.refresh(post)
-    return to_out(post, user, db)
+    return to_out(post, user, db, friend_view(db, user.id))
 
 
 @router.post("/posts/{post_id}/repost", response_model=CommunityPostOut)
@@ -221,7 +228,7 @@ def repost(
     db.add(post)
     db.commit()
     db.refresh(post)
-    return to_out(post, user, db)
+    return to_out(post, user, db, friend_view(db, user.id))
 
 
 @router.get("/posts/{post_id}/comments", response_model=list[CommunityCommentOut])
