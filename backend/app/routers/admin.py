@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from .. import mall_service as mall
 from ..auth import hash_password
 from ..database import get_db
 from ..deps import require_roles
@@ -19,7 +20,9 @@ from ..models import (
     Course,
     CoursePurchase,
     Enrollment,
+    Notification,
     Reminder,
+    ReminderCompletion,
     ReminderPreference,
     ServiceEntitlement,
     ServiceProduct,
@@ -54,28 +57,23 @@ def get_target(db: Session, user_id: int) -> User:
     return target
 
 
-def target_enrolled_course_ids(db: Session, user_id: int) -> set[int]:
-    return {
-        e.course_id
-        for e in db.query(Enrollment).filter(Enrollment.student_id == user_id).all()
-    }
+def target_enrolled_course_ids(db: Session, target: User) -> set[int]:
+    """按目标用户计算可学课程（含整包推导、有效期过滤）。"""
+    return mall.accessible_course_ids(db, target)
 
 
-def target_owned_service_ids(db: Session, user_id: int) -> set[int]:
-    return {
-        e.service_id
-        for e in db.query(ServiceEntitlement)
-        .filter(ServiceEntitlement.user_id == user_id)
-        .all()
-    }
+def target_owned_service_ids(db: Session, target: User) -> set[int]:
+    return mall.accessible_service_ids(db, target)
 
 
 def build_overview(db: Session, target: User) -> AdminOverviewOut:
-    enrolled = target_enrolled_course_ids(db, target.id)
-    owned = target_owned_service_ids(db, target.id)
+    enrolled = target_enrolled_course_ids(db, target)
+    owned = target_owned_service_ids(db, target)
 
-    courses = db.query(Course).order_by(Course.id).all()
-    services = db.query(ServiceProduct).order_by(ServiceProduct.id).all()
+    courses = db.query(Course).order_by(Course.sort_order, Course.id).all()
+    services = db.query(ServiceProduct).order_by(
+        ServiceProduct.sort_order, ServiceProduct.id
+    ).all()
     # 他名下的提醒：管理员点名下发的 + 自己建的 + 已开通课程下的
     conds = [
         Reminder.target_user_id == target.id,
@@ -90,10 +88,27 @@ def build_overview(db: Session, target: User) -> AdminOverviewOut:
         .all()
     )
 
+    course_items = []
+    for course in courses:
+        expiry = (
+            mall.course_access_info(db, target, course)[1]
+            if course.id in enrolled
+            else None
+        )
+        course_items.append(course_to_out(db, course, enrolled, expiry))
+    service_items = []
+    for service in services:
+        expiry = (
+            mall.service_access_info(db, target, service)[1]
+            if service.id in owned
+            else None
+        )
+        service_items.append(service_to_out(service, owned, expiry))
+
     return AdminOverviewOut(
         user=UserOut.model_validate(target),
-        courses=[course_to_out(c, enrolled) for c in courses],
-        services=[service_to_out(s, owned) for s in services],
+        courses=course_items,
+        services=service_items,
         reminders=[reminder_to_out(r, target, db) for r in reminders],
     )
 
@@ -124,29 +139,39 @@ def grant_course(
     course = db.get(Course, body.course_id)
     if not course:
         raise HTTPException(status_code=404, detail="课程不存在")
-    exists = (
-        db.query(Enrollment)
-        .filter(
-            Enrollment.student_id == target.id,
-            Enrollment.course_id == course.id,
-        )
-        .first()
-    )
-    if exists:
+    if mall.has_course_access(db, target, course):
         raise HTTPException(status_code=400, detail="该用户已开通这门课程")
 
-    db.add(Enrollment(student_id=target.id, course_id=course.id))
-    db.add(
-        CoursePurchase(
-            user_id=target.id,
-            course_id=course.id,
-            amount=0.0,
-            channel=GRANT_CHANNEL,
-            status="paid",
-        )
+    current = mall.now()
+    order = CoursePurchase(
+        user_id=target.id,
+        course_id=course.id,
+        amount=0.0,
+        channel=GRANT_CHANNEL,
+        status="paid",
+        created_at=current,
+        order_no=mall.unique_order_no(db, "C"),
+        quantity=1,
+        unit_price=0.0,
+        original_amount=0.0,
+        discount_amount=0.0,
+        order_type="normal",
+        paid_at=current,
+        valid_until=None,
+        remark="管理员开通",
+    )
+    db.add(order)
+    db.flush()
+    mall.grant_course_enrollment(
+        db,
+        target.id,
+        course.id,
+        order,
+        source="admin",
+        expires_at=None,
     )
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "order_no": order.order_no}
 
 
 @router.delete("/users/{user_id}/courses/{course_id}")
@@ -167,9 +192,22 @@ def revoke_course(
     )
     if not rows:
         raise HTTPException(status_code=404, detail="该用户未开通这门课程")
+    db.flush()
+    course = db.get(Course, course_id)
+    still_via_bundle = bool(
+        course and mall.has_course_access(db, target, course)
+    )
     db.commit()
     # 订单记录保留：用户在购买记录里仍能看到「管理员开通」
-    return {"ok": True}
+    return {
+        "ok": True,
+        "still_accessible_via_bundle": still_via_bundle,
+        "message": (
+            "已取消单独开通；该课程仍包含在用户已购的整包中"
+            if still_via_bundle
+            else "已取消开通"
+        ),
+    }
 
 
 @router.post("/users/{user_id}/services")
@@ -183,29 +221,39 @@ def grant_service(
     product = db.get(ServiceProduct, body.service_id)
     if not product:
         raise HTTPException(status_code=404, detail="服务不存在")
-    exists = (
-        db.query(ServiceEntitlement)
-        .filter(
-            ServiceEntitlement.user_id == target.id,
-            ServiceEntitlement.service_id == product.id,
-        )
-        .first()
-    )
-    if exists:
+    if mall.has_service_access(db, target, product):
         raise HTTPException(status_code=400, detail="该用户已开通这项服务")
 
-    db.add(ServiceEntitlement(user_id=target.id, service_id=product.id))
-    db.add(
-        ServicePurchase(
-            user_id=target.id,
-            service_id=product.id,
-            amount=0.0,
-            channel=GRANT_CHANNEL,
-            status="paid",
-        )
+    current = mall.now()
+    order = ServicePurchase(
+        user_id=target.id,
+        service_id=product.id,
+        amount=0.0,
+        channel=GRANT_CHANNEL,
+        status="paid",
+        created_at=current,
+        order_no=mall.unique_order_no(db, "S"),
+        quantity=1,
+        unit_price=0.0,
+        original_amount=0.0,
+        discount_amount=0.0,
+        order_type="normal",
+        paid_at=current,
+        valid_until=None,
+        remark="管理员开通",
+    )
+    db.add(order)
+    db.flush()
+    mall.grant_service_entitlement(
+        db,
+        target.id,
+        product.id,
+        order,
+        source="admin",
+        expires_at=None,
     )
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "order_no": order.order_no}
 
 
 @router.delete("/users/{user_id}/services/{service_id}")
@@ -289,6 +337,12 @@ def delete_any_reminder(
         raise HTTPException(status_code=404, detail="提醒不存在")
     db.query(ReminderPreference).filter(
         ReminderPreference.reminder_id == reminder_id
+    ).delete()
+    db.query(ReminderCompletion).filter(
+        ReminderCompletion.reminder_id == reminder_id
+    ).delete()
+    db.query(Notification).filter(
+        Notification.reminder_id == reminder_id
     ).delete()
     db.delete(reminder)
     db.commit()

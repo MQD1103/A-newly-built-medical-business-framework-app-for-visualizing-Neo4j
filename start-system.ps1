@@ -25,6 +25,26 @@ function Write-Step([string]$Message, [string]$Color = 'Cyan') {
   Write-Host "[启动] $Message" -ForegroundColor $Color
 }
 
+function Open-Frontend([string]$Url) {
+  # 优先系统默认浏览器；失败时退回 Edge / 资源管理器
+  try {
+    Start-Process $Url
+    return $true
+  } catch {}
+  $edge = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'
+  if (Test-Path -LiteralPath $edge) {
+    try {
+      Start-Process -FilePath $edge -ArgumentList $Url
+      return $true
+    } catch {}
+  }
+  try {
+    Start-Process 'explorer.exe' -ArgumentList $Url
+    return $true
+  } catch {}
+  return $false
+}
+
 function Get-SystemPython {
   foreach ($name in @('py', 'python')) {
     $cmd = Get-Command $name -ErrorAction SilentlyContinue
@@ -130,8 +150,10 @@ for ($i = 0; $i -lt 120; $i++) {
 }
 
 if ($readyUrl) {
-  Write-Host "[成功] 正在打开浏览器: $readyUrl" -ForegroundColor Green
-  Start-Process $readyUrl
+  Write-Host "[成功] 正在打开前端: $readyUrl" -ForegroundColor Green
+  if (-not (Open-Frontend $readyUrl)) {
+    Write-Host "[提示] 无法自动打开浏览器，请手动访问: $readyUrl" -ForegroundColor Yellow
+  }
   Write-Host ''
   Write-Host "前端: $readyUrl" -ForegroundColor Green
   Write-Host "后端: http://${BackendHost}:${BackendPort}  (接口文档 /docs)" -ForegroundColor Green

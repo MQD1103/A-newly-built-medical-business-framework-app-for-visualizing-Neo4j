@@ -2,13 +2,14 @@ from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, hash_password, verify_password
 from ..database import get_db
 from ..deps import get_current_user, require_roles
 from ..models import User
+from ..rate_limit import login_ip_limiter, login_limiter
 from ..schemas import (
     AvatarPreviewOut,
     ImpersonateIn,
@@ -29,13 +30,31 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 
 @router.post("/login", response_model=Token)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    body: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    client_ip = request.client.host if request.client else "unknown"
+    user_key = f"login:user:{client_ip}:{body.username.strip().lower()}"
+    ip_key = f"login:ip:{client_ip}"
+    wait = max(login_limiter.retry_after(user_key), login_ip_limiter.retry_after(ip_key))
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"登录尝试过于频繁，请 {wait} 秒后再试",
+            headers={"Retry-After": str(wait)},
+        )
+
     user = db.query(User).filter(User.username == body.username).first()
     if not user or not verify_password(body.password, user.password_hash):
+        login_limiter.hit(user_key)
+        login_ip_limiter.hit(ip_key)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误",
         )
+    login_limiter.reset(user_key)
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return Token(access_token=token)
 

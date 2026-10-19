@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import CalendarEvent, User
+from ..models import CalendarEvent, Notification, User
 from ..schemas import HomeOut
 from .notices import list_notices
 from .reminders import list_reminders
@@ -23,7 +23,11 @@ def home_dashboard(
     all_slots = list_slots(db=db, user=user)
     today_slots = [s for s in all_slots if s.weekday == weekday]
 
-    reminders = [r for r in list_reminders(db=db, user=user) if r.notify_enabled]
+    reminders = [
+        r
+        for r in list_reminders(db=db, user=user)
+        if r.notify_enabled and not r.completed
+    ]
     # 临近：未过期前 7 天内 + 已过期最近 3 条
     upcoming = []
     overdue_recent = []
@@ -47,9 +51,19 @@ def home_dashboard(
         .all()
     )
 
+    unread_notifications = (
+        db.query(Notification)
+        .filter(
+            Notification.user_id == user.id,
+            Notification.read_at.is_(None),
+        )
+        .count()
+    )
+
     return HomeOut(
         today_slots=today_slots,
         upcoming_reminders=upcoming_reminders,
         latest_notices=notices,
         upcoming_events=events,
+        unread_notifications=unread_notifications,
     )

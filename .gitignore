@@ -5,12 +5,19 @@ backend/**/__pycache__/
 *.pyo
 backend/edu.db
 backend/*.db
+backend/*.db-journal
+backend/*.db-wal
+backend/*.db-shm
+# 本地备份含业务数据，绝不进仓库
+backend/backups/
 
 # 上传文件（本地数据，不进仓库）
 backend/uploads/avatars/
 backend/uploads/community/
 # 保留课程封面等静态资源：只忽略用户上传，课程 svg 可提交
 !backend/uploads/courses/
+# 本地演示视频，用 backend/scripts/generate_demo_videos.py 生成
+backend/uploads/courses/demo/
 
 # Node
 frontend/node_modules/

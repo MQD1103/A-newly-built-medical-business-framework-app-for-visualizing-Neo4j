@@ -1538,6 +1538,147 @@ textarea:focus {
   font-weight: 600;
 }
 
+.lesson-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lesson-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lesson-head .section-label {
+  margin: 0;
+}
+
+.lesson-count {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.lesson-player-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #071f22;
+}
+
+.lesson-player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #061b1e;
+}
+
+.lesson-player-empty {
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #c9e7e3;
+  background: linear-gradient(135deg, #0b3b3a, #124b52);
+}
+
+.lesson-now {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.lesson-now strong {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.lesson-now .meta {
+  flex-shrink: 0;
+}
+
+.lesson-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lesson-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(91, 163, 245, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lesson-row.active {
+  border-color: #3b86e0;
+  background: rgba(91, 163, 245, 0.12);
+}
+
+.lesson-row.locked {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.lesson-index {
+  flex: 0 0 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(59, 134, 224, 0.12);
+  color: #2f74c8;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.lesson-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lesson-row-main strong {
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.lesson-state {
+  flex-shrink: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #2f74c8;
+}
+
+.lesson-row.locked .lesson-state {
+  color: var(--muted);
+}
+
+.lesson-done {
+  align-self: flex-start;
+}
+
 .section-label {
   margin: 0 0 8px;
   font-size: 0.95rem;

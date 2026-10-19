@@ -3,8 +3,247 @@ from sqlalchemy import inspect, text
 from .database import engine
 
 
+def _table_columns(conn, table: str) -> set[str]:
+    # 用 SQLAlchemy 反射而不是 PRAGMA，SQLite / MySQL 都可复用
+    return {c["name"] for c in inspect(conn).get_columns(table)}
+
+
+def _ensure_unique_index(conn, table: str, index_name: str, column: str) -> None:
+    """补唯一索引；MySQL 不支持 CREATE INDEX IF NOT EXISTS，先查现有索引。"""
+    existing = {i["name"] for i in inspect(conn).get_indexes(table)}
+    if index_name not in existing:
+        conn.execute(
+            text(f"CREATE UNIQUE INDEX {index_name} ON {table}({column})")
+        )
+
+
+def _add_columns(table: str, columns: dict[str, str]) -> None:
+    """给已有 SQLite 表补列；新库由 create_all 直接建好，这里会全部跳过。"""
+    with engine.begin() as conn:
+        existing = _table_columns(conn, table)
+        for name, ddl in columns.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
+def _migrate_mall_tables() -> None:
+    """商城：课程/订单/权益新增字段、订单号回填、索引。"""
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+
+    if "courses" in tables:
+        _add_columns(
+            "courses",
+            {
+                "course_type": "VARCHAR(20) DEFAULT 'single'",
+                "path_label": "VARCHAR(40) DEFAULT ''",
+                "tagline": "VARCHAR(200) DEFAULT ''",
+                "original_price": "FLOAT",
+                "status": "VARCHAR(20) DEFAULT 'on'",
+                "sort_order": "INTEGER DEFAULT 0",
+                "valid_days": "INTEGER DEFAULT 730",
+                "trial_lesson_count": "INTEGER DEFAULT 1",
+            },
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE courses SET course_type='single' "
+                     "WHERE course_type IS NULL OR course_type=''")
+            )
+            conn.execute(
+                text("UPDATE courses SET status='on' "
+                     "WHERE status IS NULL OR status=''")
+            )
+            conn.execute(
+                text("UPDATE courses SET sort_order=id WHERE sort_order IS NULL")
+            )
+            conn.execute(
+                text("UPDATE courses SET valid_days=730 "
+                     "WHERE valid_days IS NULL OR valid_days<=0")
+            )
+            conn.execute(
+                text("UPDATE courses SET trial_lesson_count=1 "
+                     "WHERE trial_lesson_count IS NULL OR trial_lesson_count<0")
+            )
+
+    if "enrollments" in tables:
+        _add_columns(
+            "enrollments",
+            {
+                "order_id": "INTEGER REFERENCES course_purchases(id)",
+                "source": "VARCHAR(20) DEFAULT 'seed'",
+                "granted_at": "DATETIME",
+                "expires_at": "DATETIME",
+            },
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE enrollments SET source='seed' "
+                     "WHERE source IS NULL OR source=''")
+            )
+            conn.execute(
+                text("UPDATE enrollments SET granted_at=CURRENT_TIMESTAMP "
+                     "WHERE granted_at IS NULL")
+            )
+
+    if "course_purchases" in tables:
+        _add_columns(
+            "course_purchases",
+            {
+                "order_no": "VARCHAR(40) DEFAULT ''",
+                "quantity": "INTEGER DEFAULT 1",
+                "unit_price": "FLOAT DEFAULT 0",
+                "original_amount": "FLOAT DEFAULT 0",
+                "discount_amount": "FLOAT DEFAULT 0",
+                "order_type": "VARCHAR(20) DEFAULT 'normal'",
+                "upgrade_from_order_id": "INTEGER",
+                "upgraded_to_order_id": "INTEGER",
+                "transaction_id": "VARCHAR(100) DEFAULT ''",
+                "valid_until": "DATETIME",
+                "expires_at": "DATETIME",
+                "paid_at": "DATETIME",
+                "cancelled_at": "DATETIME",
+                "refund_reason": "TEXT DEFAULT ''",
+                "refund_amount": "FLOAT DEFAULT 0",
+                "refunded_at": "DATETIME",
+                "remark": "TEXT DEFAULT ''",
+            },
+        )
+        old_order_no = ("'C-OLD-' || id" if engine.dialect.name == "sqlite"
+                        else "CONCAT('C-OLD-', id)")
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE course_purchases SET order_no={old_order_no} "
+                     "WHERE order_no IS NULL OR order_no=''")
+            )
+            conn.execute(
+                text("UPDATE course_purchases SET quantity=1 "
+                     "WHERE quantity IS NULL OR quantity<=0")
+            )
+            conn.execute(
+                text("UPDATE course_purchases SET unit_price=amount "
+                     "WHERE unit_price IS NULL OR unit_price=0")
+            )
+            conn.execute(
+                text("UPDATE course_purchases SET original_amount=amount "
+                     "WHERE original_amount IS NULL OR original_amount=0")
+            )
+            conn.execute(
+                text("UPDATE course_purchases SET order_type='normal' "
+                     "WHERE order_type IS NULL OR order_type=''")
+            )
+            conn.execute(
+                text("UPDATE course_purchases SET paid_at=created_at "
+                     "WHERE paid_at IS NULL AND status='paid'")
+            )
+            _ensure_unique_index(
+                conn, "course_purchases", "ux_course_purchases_order_no", "order_no"
+            )
+
+    if "service_products" in tables:
+        _add_columns(
+            "service_products",
+            {
+                "tagline": "VARCHAR(200) DEFAULT ''",
+                "original_price": "FLOAT",
+                "status": "VARCHAR(20) DEFAULT 'on'",
+                "sort_order": "INTEGER DEFAULT 0",
+                "valid_days": "INTEGER DEFAULT 365",
+            },
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE service_products SET status='on' "
+                     "WHERE status IS NULL OR status=''")
+            )
+            conn.execute(
+                text("UPDATE service_products SET sort_order=id "
+                     "WHERE sort_order IS NULL")
+            )
+            conn.execute(
+                text("UPDATE service_products SET valid_days=365 "
+                     "WHERE valid_days IS NULL OR valid_days<=0")
+            )
+
+    if "service_entitlements" in tables:
+        _add_columns(
+            "service_entitlements",
+            {
+                "order_id": "INTEGER REFERENCES service_purchases(id)",
+                "source": "VARCHAR(20) DEFAULT 'seed'",
+                "granted_at": "DATETIME",
+                "expires_at": "DATETIME",
+            },
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE service_entitlements SET source='seed' "
+                     "WHERE source IS NULL OR source=''")
+            )
+            conn.execute(
+                text("UPDATE service_entitlements SET "
+                     "granted_at=CURRENT_TIMESTAMP WHERE granted_at IS NULL")
+            )
+
+    if "service_purchases" in tables:
+        _add_columns(
+            "service_purchases",
+            {
+                "order_no": "VARCHAR(40) DEFAULT ''",
+                "quantity": "INTEGER DEFAULT 1",
+                "unit_price": "FLOAT DEFAULT 0",
+                "original_amount": "FLOAT DEFAULT 0",
+                "discount_amount": "FLOAT DEFAULT 0",
+                "order_type": "VARCHAR(20) DEFAULT 'normal'",
+                "transaction_id": "VARCHAR(100) DEFAULT ''",
+                "valid_until": "DATETIME",
+                "expires_at": "DATETIME",
+                "paid_at": "DATETIME",
+                "cancelled_at": "DATETIME",
+                "refund_reason": "TEXT DEFAULT ''",
+                "refund_amount": "FLOAT DEFAULT 0",
+                "refunded_at": "DATETIME",
+                "remark": "TEXT DEFAULT ''",
+            },
+        )
+        old_order_no = ("'S-OLD-' || id" if engine.dialect.name == "sqlite"
+                        else "CONCAT('S-OLD-', id)")
+        with engine.begin() as conn:
+            conn.execute(
+                text(f"UPDATE service_purchases SET order_no={old_order_no} "
+                     "WHERE order_no IS NULL OR order_no=''")
+            )
+            conn.execute(
+                text("UPDATE service_purchases SET quantity=1 "
+                     "WHERE quantity IS NULL OR quantity<=0")
+            )
+            conn.execute(
+                text("UPDATE service_purchases SET unit_price=amount "
+                     "WHERE unit_price IS NULL OR unit_price=0")
+            )
+            conn.execute(
+                text("UPDATE service_purchases SET original_amount=amount "
+                     "WHERE original_amount IS NULL OR original_amount=0")
+            )
+            conn.execute(
+                text("UPDATE service_purchases SET order_type='normal' "
+                     "WHERE order_type IS NULL OR order_type=''")
+            )
+            conn.execute(
+                text("UPDATE service_purchases SET paid_at=created_at "
+                     "WHERE paid_at IS NULL AND status='paid'")
+            )
+            _ensure_unique_index(
+                conn, "service_purchases", "ux_service_purchases_order_no", "order_no"
+            )
+
+
 def ensure_schema() -> None:
-    """为已有 SQLite 库补齐新增列。"""
+    """为已有库补齐新增列。
+
+    SQLite 老库可原地升级；MySQL 仅支持由 ``create_all`` 新建的空库，
+    不负责从旧版本 MySQL 结构迁移。生产环境结构变更建议使用 Alembic。
+    """
     insp = inspect(engine)
     tables = insp.get_table_names()
     if "users" not in tables:
@@ -34,7 +273,12 @@ def ensure_schema() -> None:
             (c for c in insp.get_columns("reminders") if c["name"] == "course_id"),
             None,
         )
-        if course_col is not None and course_col.get("nullable") is False:
+        # 只有 SQLite 需要重建表改可空；MySQL 新库由 create_all 直接建对。
+        if (
+            engine.dialect.name == "sqlite"
+            and course_col is not None
+            and course_col.get("nullable") is False
+        ):
             with engine.begin() as conn:
                 conn.execute(text("PRAGMA foreign_keys=OFF"))
                 conn.execute(
@@ -139,3 +383,5 @@ def ensure_schema() -> None:
                         "DEFAULT ''"
                     )
                 )
+
+    _migrate_mall_tables()

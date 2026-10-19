@@ -31,6 +31,31 @@ export interface Course {
   enrolled?: boolean
 }
 
+export interface Lesson {
+  id: number
+  course_id: number
+  title: string
+  summary: string
+  video_url: string
+  duration_seconds: number
+  sort_order: number
+  is_trial: boolean
+  /** 未购买且非试看时为 true，此时 video_url 为空 */
+  locked: boolean
+}
+
+export interface CourseLessons {
+  course_id: number
+  course_name: string
+  owned: boolean
+  is_free: boolean
+  trial_lesson_count: number
+  total_lessons: number
+  completed_lessons: number
+  progress_percent: number
+  lessons: Lesson[]
+}
+
 export interface ServiceProduct {
   id: number
   name: string

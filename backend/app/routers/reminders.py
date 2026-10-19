@@ -4,10 +4,25 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from .. import mall_service as mall
+from .. import notification_service
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import Course, Enrollment, Reminder, ReminderPreference, User
-from ..schemas import ReminderCreate, ReminderNotifyUpdate, ReminderOut, ReminderUpdate
+from ..models import (
+    Course,
+    Notification,
+    Reminder,
+    ReminderCompletion,
+    ReminderPreference,
+    User,
+)
+from ..schemas import (
+    ReminderCreate,
+    ReminderDoneUpdate,
+    ReminderNotifyUpdate,
+    ReminderOut,
+    ReminderUpdate,
+)
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
 
@@ -44,6 +59,14 @@ def can_edit_reminder(user: User, reminder: Reminder) -> bool:
 
 def to_out(r: Reminder, user: User, db: Session) -> ReminderOut:
     source = r.source or "manager"
+    completion = (
+        db.query(ReminderCompletion)
+        .filter(
+            ReminderCompletion.user_id == user.id,
+            ReminderCompletion.reminder_id == r.id,
+        )
+        .first()
+    )
     return ReminderOut(
         id=r.id,
         course_id=r.course_id,
@@ -58,6 +81,8 @@ def to_out(r: Reminder, user: User, db: Session) -> ReminderOut:
         status=reminder_status(r.due_at),
         source=source,
         notify_enabled=get_notify_enabled(db, user.id, r.id),
+        completed=completion is not None,
+        completed_at=completion.completed_at if completion else None,
         can_delete=source == "user" and r.creator_id == user.id,
         can_edit=can_edit_reminder(user, r),
     )
@@ -72,12 +97,8 @@ def can_manage_course(user: User, course: Course) -> bool:
 
 
 def student_enrolled(db: Session, user: User, course_id: int) -> bool:
-    return (
-        db.query(Enrollment)
-        .filter(Enrollment.student_id == user.id, Enrollment.course_id == course_id)
-        .first()
-        is not None
-    )
+    """与商城学习权保持一致：整包推导、有效期都算。"""
+    return course_id in mall.accessible_course_ids(db, user)
 
 
 def user_can_see(db: Session, user: User, reminder: Reminder) -> bool:
@@ -107,10 +128,7 @@ def list_reminders(
     if user.role == "admin":
         pass
     elif user.role == "student":
-        course_ids = [
-            e.course_id
-            for e in db.query(Enrollment).filter(Enrollment.student_id == user.id).all()
-        ]
+        course_ids = list(mall.accessible_course_ids(db, user))
         if course_ids:
             q = q.filter(or_(own, mine, Reminder.course_id.in_(course_ids)))
         else:
@@ -163,6 +181,9 @@ def create_reminder(
     db.add(reminder)
     db.commit()
     db.refresh(reminder)
+    # 在提醒窗口内时立即生成通知，不必等下一轮扫描
+    notification_service.sync_reminder_notifications(db, reminder)
+    db.commit()
     return to_out(reminder, user, db)
 
 
@@ -188,6 +209,8 @@ def update_reminder(
         reminder.external_url = body.external_url.strip()
     db.commit()
     db.refresh(reminder)
+    notification_service.sync_reminder_notifications(db, reminder)
+    db.commit()
     return to_out(reminder, user, db)
 
 
@@ -230,6 +253,52 @@ def set_reminder_notify(
     return to_out(reminder, user, db)
 
 
+@router.post("/{reminder_id}/complete", response_model=ReminderOut)
+def complete_reminder(
+    reminder_id: int,
+    body: ReminderDoneUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """标记/取消「我已完成」；完成状态只影响当前用户。"""
+    reminder = db.get(Reminder, reminder_id)
+    if not reminder:
+        raise HTTPException(status_code=404, detail="提醒不存在")
+    if not user_can_see(db, user, reminder):
+        raise HTTPException(status_code=403, detail="无权操作")
+
+    completion = (
+        db.query(ReminderCompletion)
+        .filter(
+            ReminderCompletion.user_id == user.id,
+            ReminderCompletion.reminder_id == reminder_id,
+        )
+        .first()
+    )
+    current = datetime.utcnow()
+    if body.completed:
+        if completion is None:
+            db.add(
+                ReminderCompletion(
+                    user_id=user.id,
+                    reminder_id=reminder_id,
+                    completed_at=current,
+                )
+            )
+        # 已完成的事项不再在收件箱里保持未读
+        db.query(Notification).filter(
+            Notification.user_id == user.id,
+            Notification.reminder_id == reminder_id,
+            Notification.read_at.is_(None),
+        ).update({"read_at": current}, synchronize_session=False)
+    elif completion is not None:
+        db.delete(completion)
+
+    db.commit()
+    db.refresh(reminder)
+    return to_out(reminder, user, db)
+
+
 @router.delete("/{reminder_id}")
 def delete_reminder(
     reminder_id: int,
@@ -244,7 +313,15 @@ def delete_reminder(
         raise HTTPException(status_code=403, detail="管理者或系统添加的提醒不可删除")
     if reminder.creator_id != user.id:
         raise HTTPException(status_code=403, detail="只能删除自己添加的提醒")
-    db.query(ReminderPreference).filter(ReminderPreference.reminder_id == reminder_id).delete()
+    db.query(ReminderPreference).filter(
+        ReminderPreference.reminder_id == reminder_id
+    ).delete()
+    db.query(ReminderCompletion).filter(
+        ReminderCompletion.reminder_id == reminder_id
+    ).delete()
+    db.query(Notification).filter(
+        Notification.reminder_id == reminder_id
+    ).delete()
     db.delete(reminder)
     db.commit()
     return {"ok": True}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
-import type { Course, ScheduleSlot } from '../types'
+import type { Course, CourseLessons, Lesson, ScheduleSlot } from '../types'
 import { formatPrice, mediaUrl, priceText, weekdayLabel } from '../utils'
 
 /** 课程价格兜底值，与后端 courses.py 的默认售价保持一致 */
@@ -13,6 +13,11 @@ function Cover({ src, alt }: { src?: string; alt: string }) {
     return <img src={mediaUrl(src)} alt={alt} className="course-cover-img" loading="lazy" />
   }
   return <div className="course-cover-fallback" aria-hidden="true" />
+}
+
+function durationLabel(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds || 0))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
 export default function Courses() {
@@ -26,6 +31,10 @@ export default function Courses() {
   const [activeId, setActiveId] = useState<number | null>(focusId)
   const [buying, setBuying] = useState(false)
   const [payTip, setPayTip] = useState('')
+  const [lessonData, setLessonData] = useState<CourseLessons | null>(null)
+  const [activeLessonId, setActiveLessonId] = useState<number | null>(null)
+  const [lessonError, setLessonError] = useState('')
+  const [marking, setMarking] = useState(false)
 
   const isAdmin = user?.role === 'admin'
 
@@ -59,6 +68,44 @@ export default function Courses() {
   useEffect(() => {
     if (focusId) setActiveId(focusId)
   }, [focusId])
+
+  useEffect(() => {
+    if (activeId == null) {
+      setLessonData(null)
+      setActiveLessonId(null)
+      return
+    }
+    let cancelled = false
+    setLessonData(null)
+    setLessonError('')
+    api<CourseLessons>(`/api/courses/${activeId}/lessons`)
+      .then((data) => {
+        if (cancelled) return
+        setLessonData(data)
+        setActiveLessonId((current) => {
+          const same = data.lessons.find((x) => x.id === current)
+          if (same && !same.locked) return current
+          return (
+            data.lessons.find((x) => !x.locked)?.id ??
+            data.lessons[0]?.id ??
+            null
+          )
+        })
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setLessonError(e instanceof Error ? e.message : '课时加载失败')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeId])
+
+  const activeLesson = useMemo(
+    () => lessonData?.lessons.find((x) => x.id === activeLessonId) ?? null,
+    [lessonData, activeLessonId],
+  )
 
   const active = useMemo(
     () => courses.find((c) => c.id === activeId) ?? null,
@@ -104,6 +151,29 @@ export default function Courses() {
       setError(e instanceof Error ? e.message : '购买失败')
     } finally {
       setBuying(false)
+    }
+  }
+
+  async function markLessonDone(lesson: Lesson) {
+    if (marking || lesson.locked || !lessonData) return
+    setMarking(true)
+    setLessonError('')
+    try {
+      await api(`/api/courses/lessons/${lesson.id}/progress`, {
+        method: 'POST',
+        body: JSON.stringify({
+          position_seconds: lesson.duration_seconds || 0,
+          completed: true,
+        }),
+      })
+      const refreshed = await api<CourseLessons>(
+        `/api/courses/${lessonData.course_id}/lessons`,
+      )
+      setLessonData(refreshed)
+    } catch (e) {
+      setLessonError(e instanceof Error ? e.message : '记录学习进度失败')
+    } finally {
+      setMarking(false)
     }
   }
 
@@ -206,6 +276,104 @@ export default function Courses() {
                 </div>
               )}
               {payTip ? <p className="ok-tip">{payTip}</p> : null}
+            </section>
+          )}
+
+          {active && (
+            <section className="item-card lesson-section">
+              <div className="lesson-head">
+                <h3 className="section-label">课时学习</h3>
+                {lessonData ? (
+                  <span className="lesson-count">
+                    已完成 {lessonData.completed_lessons}/{lessonData.total_lessons}
+                  </span>
+                ) : null}
+              </div>
+              {lessonError ? <p className="error">{lessonError}</p> : null}
+              {!lessonData ? (
+                <p className="muted">课时加载中…</p>
+              ) : lessonData.lessons.length === 0 ? (
+                <p className="muted">该课程暂无课时</p>
+              ) : (
+                <>
+                  <div className="lesson-player-wrap">
+                    {activeLesson &&
+                    !activeLesson.locked &&
+                    activeLesson.video_url ? (
+                      <video
+                        key={activeLesson.id}
+                        className="lesson-player"
+                        src={mediaUrl(activeLesson.video_url)}
+                        poster={mediaUrl(
+                          activeLesson.video_url.replace(/\.mp4$/i, '.jpg'),
+                        )}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        onEnded={() => void markLessonDone(activeLesson)}
+                      />
+                    ) : (
+                      <div className="lesson-player-empty">
+                        {activeLesson?.locked
+                          ? '购买后可观看该课时'
+                          : activeLesson
+                            ? '该课时暂未配置视频'
+                            : '请选择课时'}
+                      </div>
+                    )}
+                    {activeLesson ? (
+                      <div className="lesson-now">
+                        <strong>{activeLesson.title}</strong>
+                        <span className="meta">
+                          {durationLabel(activeLesson.duration_seconds)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <ul className="lesson-list">
+                    {lessonData.lessons.map((lesson, index) => (
+                      <li key={lesson.id}>
+                        <button
+                          type="button"
+                          className={`lesson-row${
+                            lesson.id === activeLessonId ? ' active' : ''
+                          }${lesson.locked ? ' locked' : ''}`}
+                          disabled={lesson.locked}
+                          onClick={() => setActiveLessonId(lesson.id)}
+                        >
+                          <span className="lesson-index">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          <span className="lesson-row-main">
+                            <strong>{lesson.title}</strong>
+                            <span className="meta">
+                              {durationLabel(lesson.duration_seconds)}
+                              {lesson.locked
+                                ? ' · 购买后解锁'
+                                : lesson.is_trial
+                                  ? ' · 可试看'
+                                  : ''}
+                            </span>
+                          </span>
+                          <span className="lesson-state">
+                            {lesson.locked ? '锁定' : '播放'}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {activeLesson && !activeLesson.locked ? (
+                    <button
+                      type="button"
+                      className="btn small lesson-done"
+                      disabled={marking}
+                      onClick={() => void markLessonDone(activeLesson)}
+                    >
+                      {marking ? '记录中…' : '标记本节已学完'}
+                    </button>
+                  ) : null}
+                </>
+              )}
             </section>
           )}
 

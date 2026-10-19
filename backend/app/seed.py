@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -7,9 +8,15 @@ from .models import (
     CalendarEvent,
     CommunityPost,
     Course,
+    CourseBundleItem,
     CourseMaterial,
+    CourseOrderSeat,
+    CoursePurchase,
     Enrollment,
     Grade,
+    HospitalPartner,
+    Lesson,
+    LessonProgress,
     Notice,
     Reminder,
     ScheduleSlot,
@@ -272,7 +279,7 @@ def ensure_copd_courses(db: Session) -> None:
         return
 
     # 清空旧课关联后写入 COPD
-    from .models import CoursePurchase, ReminderPreference
+    from .models import ReminderPreference
 
     rem_ids = [r.id for r in db.query(Reminder).filter(Reminder.course_id.isnot(None)).all()]
     if rem_ids:
@@ -283,6 +290,10 @@ def ensure_copd_courses(db: Session) -> None:
     db.query(ScheduleSlot).delete()
     db.query(CourseMaterial).delete()
     db.query(Grade).delete()
+    db.query(LessonProgress).delete()
+    db.query(Lesson).delete()
+    db.query(CourseOrderSeat).delete()
+    db.query(CourseBundleItem).delete()
     db.query(Enrollment).delete()
     db.query(CoursePurchase).delete()
     db.query(Course).delete()
@@ -377,7 +388,264 @@ def ensure_extra_admin(db: Session) -> None:
     db.commit()
 
 
+# ---------- 商城目录 ----------
+
+COPD_PATH_LABELS = {
+    "COPD 认识与早期筛查": "预防与预测",
+    "COPD 呼吸康复入门": "预防与预测",
+    "COPD 用药与吸入装置指导": "患病管理",
+    "COPD 急性加重自我管理": "患病管理",
+    "COPD 家庭氧疗与日常护理": "患病管理",
+}
+
+COPD_TAGLINES = {
+    "COPD 认识与早期筛查": "先弄清 COPD 是什么、自己有没有风险",
+    "COPD 呼吸康复入门": "呼吸训练与居家康复的基础方法",
+    "COPD 用药与吸入装置指导": "把药吸对：常用药物与装置操作",
+    "COPD 急性加重自我管理": "识别加重信号，知道何时就医",
+    "COPD 家庭氧疗与日常护理": "家庭氧疗安全与日常照护要点",
+}
+
+SERVICE_TAGLINES = {
+    "COPD 远程随访咨询": "医护远程随访，复核症状与用药依从性",
+    "居家呼吸康复指导": "一对一呼吸训练与活动耐力指导",
+    "吸入装置使用教学": "纠正漏按、吸气过快等常见错误",
+    "用药依从性托管": "按日提醒并记录，月度简报反馈",
+    "急性加重绿色通道咨询": "出现加重信号时的就医路径咨询",
+}
+
+INTRO_COURSE_NAME = "COPD 免费入门课：这门课能帮你做什么"
+BUNDLE_COURSE_NAME = "COPD 系统课（整包）"
+
+# 演示视频由 backend/scripts/generate_demo_videos.py 本地生成或从开源片源裁剪；
+# 文件不进仓库。默认 10 秒，需与脚本 --seconds 保持一致。
+DEMO_VIDEO_DIR = Path(__file__).resolve().parent.parent / "uploads" / "courses" / "demo"
+DEMO_VIDEO_SECONDS = 10
+
+
+def _ensure_lessons(db: Session, course: Course) -> None:
+    """给没有课时的课程补一套演示课时；每个付费课程第 1 节可试看。"""
+    if db.query(Lesson.id).filter(Lesson.course_id == course.id).first():
+        return
+    if course.course_type == "intro":
+        rows = [
+            ("COPD 是什么、危险因素有哪些", 480),
+            ("这门课能帮你做什么、何时必须就医", 600),
+        ]
+        for index, (title, duration) in enumerate(rows, start=1):
+            db.add(
+                Lesson(
+                    course_id=course.id,
+                    title=f"{course.name} · {title}",
+                    summary="",
+                    video_url="",
+                    duration_seconds=duration,
+                    sort_order=index,
+                    is_trial=True,
+                )
+            )
+        return
+
+    rows = [
+        ("课程导览与学习目标", 480, True),
+        ("核心知识点讲解", 720, False),
+        ("日常执行清单与自测", 540, False),
+    ]
+    for index, (title, duration, trial) in enumerate(rows, start=1):
+        db.add(
+            Lesson(
+                course_id=course.id,
+                title=title,
+                summary="",
+                video_url="",
+                duration_seconds=duration,
+                sort_order=index,
+                is_trial=trial,
+            )
+        )
+
+
+def ensure_mall_catalog(db: Session) -> None:
+    """补齐商城目录：课程类型/路径/卖点、免费入门课、整包与课时。
+
+    只补空值，不覆盖管理员后续改过的价格与上下架状态。
+    """
+    courses = db.query(Course).order_by(Course.id).all()
+    for course in courses:
+        if course.course_type not in ("intro", "single", "bundle"):
+            course.course_type = "single"
+        if not course.status:
+            course.status = "on"
+        if not course.valid_days or course.valid_days < 0:
+            course.valid_days = 730
+        if course.trial_lesson_count is None or course.trial_lesson_count < 0:
+            course.trial_lesson_count = 1
+        if not course.path_label and course.course_type == "single":
+            course.path_label = COPD_PATH_LABELS.get(course.name, "")
+        if not course.tagline and course.course_type == "single":
+            course.tagline = COPD_TAGLINES.get(course.name, "")
+    db.commit()
+
+    # 免费入门课
+    intro = (
+        db.query(Course)
+        .filter(Course.course_type == "intro")
+        .order_by(Course.id)
+        .first()
+    )
+    if not intro:
+        intro = Course(
+            name=INTRO_COURSE_NAME,
+            semester="COPD 系列",
+            teacher_id=None,
+            description=(
+                "注册即可免费学习：COPD 是什么、这门课能帮你做什么、"
+                "出现哪些情况必须及时就医。"
+            ),
+            price=0.0,
+            cover_url="",
+            course_type="intro",
+            path_label="免费入门",
+            tagline="先了解 COPD 与就医时机，再决定学哪条路径",
+            status="on",
+            sort_order=0,
+            valid_days=0,
+            trial_lesson_count=99,
+        )
+        db.add(intro)
+        db.flush()
+    else:
+        if float(intro.price or 0) != 0:
+            intro.price = 0.0
+        intro.course_type = "intro"
+        intro.path_label = intro.path_label or "免费入门"
+        intro.valid_days = 0
+        intro.trial_lesson_count = 99
+        intro.sort_order = 0
+
+    singles = (
+        db.query(Course)
+        .filter(Course.course_type == "single")
+        .order_by(Course.sort_order, Course.id)
+        .all()
+    )
+    for course in singles:
+        if not course.sort_order:
+            course.sort_order = 100 + course.id
+
+    # 整包
+    bundle = (
+        db.query(Course)
+        .filter(Course.course_type == "bundle")
+        .order_by(Course.id)
+        .first()
+    )
+    if not bundle and singles:
+        original = round(sum(float(c.price or 0) for c in singles), 2)
+        bundle = Course(
+            name=BUNDLE_COURSE_NAME,
+            semester="COPD 系列",
+            teacher_id=None,
+            description=(
+                "预防、预测、患病后管理与日常应做事项四个板块一次学完，"
+                "含有效期内小版本更新。"
+            ),
+            price=round(original * 0.7, 2),
+            original_price=original,
+            cover_url="",
+            course_type="bundle",
+            path_label="整包",
+            tagline="四个板块一次学完，低于单课合计",
+            status="on",
+            sort_order=10,
+            valid_days=730,
+            trial_lesson_count=1,
+        )
+        db.add(bundle)
+        db.flush()
+    if bundle:
+        bundle.sort_order = bundle.sort_order or 10
+        has_items = (
+            db.query(CourseBundleItem.id)
+            .filter(CourseBundleItem.bundle_id == bundle.id)
+            .first()
+        )
+        if not has_items:
+            for index, course in enumerate(singles):
+                db.add(
+                    CourseBundleItem(
+                        bundle_id=bundle.id,
+                        course_id=course.id,
+                        sort_order=index,
+                    )
+                )
+
+    # 课时
+    for course in db.query(Course).order_by(Course.id).all():
+        if course.course_type != "bundle":
+            _ensure_lessons(db, course)
+
+    # 服务商品字段
+    for service in db.query(ServiceProduct).order_by(ServiceProduct.id).all():
+        if not service.status:
+            service.status = "on"
+        if not service.tagline:
+            service.tagline = SERVICE_TAGLINES.get(service.name, "")
+        if not service.valid_days or service.valid_days < 0:
+            service.valid_days = 365
+        if not service.sort_order:
+            service.sort_order = 100 + service.id
+    db.commit()
+
+    attach_demo_lesson_videos(db)
+
+
+def attach_demo_lesson_videos(db: Session) -> None:
+    """本地演示视频存在时，自动挂到还没有视频地址的课时上。
+
+    只补空值，不覆盖管理员填写的真实视频；文件缺失时保持原样。
+    """
+    if not DEMO_VIDEO_DIR.is_dir():
+        return
+    changed = False
+    for lesson in db.query(Lesson).all():
+        if (lesson.video_url or "").strip():
+            continue
+        candidate = DEMO_VIDEO_DIR / f"lesson-{lesson.id}.mp4"
+        if not candidate.is_file():
+            continue
+        lesson.video_url = f"/uploads/courses/demo/{candidate.name}"
+        # 演示片只有几秒，让页面显示的时长与实际一致
+        lesson.duration_seconds = DEMO_VIDEO_SECONDS
+        changed = True
+    if changed:
+        db.commit()
+
+
+def ensure_demo_hospital(db: Session) -> None:
+    """演示合作医院；真实医院由管理员在后台开通，地址只放环境变量。"""
+    exists = (
+        db.query(HospitalPartner)
+        .filter(HospitalPartner.code == "demo-hospital")
+        .first()
+    )
+    if exists:
+        return
+    db.add(
+        HospitalPartner(
+            code="demo-hospital",
+            name="示范合作医院（演示）",
+            department="呼吸内科",
+            status="enabled",
+            mode="demo",
+            note="内置演示数据，仅用于功能联调，不作为诊疗依据",
+        )
+    )
+    db.commit()
+
+
 def seed_if_empty(db: Session) -> None:
+    ensure_demo_hospital(db)
     if db.query(User).first():
         ensure_copd_courses(db)
         ensure_demo_avatars(db)
@@ -385,6 +653,7 @@ def seed_if_empty(db: Session) -> None:
         ensure_demo_materials_grades(db)
         ensure_demo_service_products(db)
         ensure_extra_admin(db)
+        ensure_mall_catalog(db)
         return
 
     admin = User(
@@ -617,3 +886,4 @@ def seed_if_empty(db: Session) -> None:
 
     db.commit()
     ensure_extra_admin(db)
+    ensure_mall_catalog(db)
