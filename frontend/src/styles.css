@@ -3245,3 +3245,203 @@ textarea:focus {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.95);
 }
+
+/* ============================================================
+ * 首页星图特效升级（纯 CSS 追加，不影响任何交互逻辑）
+ * 1) 玻璃质感球体  2) 主键呼吸灯  3) 悬浮升起
+ * 4) 连线流光增强  5) 背景缓漂光斑  6) 选中光环旋转
+ * ============================================================ */
+
+/* ---- 1) 玻璃质感：顶部高光 + 底部环境反光 ---- */
+.neo-node::after {
+  content: '';
+  position: absolute;
+  left: 10%;
+  top: 6%;
+  width: 56%;
+  height: 34%;
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.75),
+    rgba(255, 255, 255, 0.12) 70%,
+    transparent
+  );
+  filter: blur(0.5px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.neo-node::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 120%,
+    rgba(91, 163, 245, 0.28),
+    transparent 65%
+  );
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity 0.3s ease;
+}
+
+.neo-node:hover::before {
+  opacity: 1;
+}
+
+/* 文字保持在玻璃高光之上 */
+.neo-node-core,
+.neo-node-sub {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 1px 3px rgba(10, 50, 100, 0.35);
+}
+
+/* ---- 2) 主键呼吸灯：柔和的光晕周期 ---- */
+.neo-node.is-primary {
+  animation: neo-primary-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes neo-primary-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 8px 20px rgba(47, 116, 200, 0.3),
+      0 0 0 0 rgba(1, 139, 255, 0.22),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 10px 26px rgba(47, 116, 200, 0.4),
+      0 0 22px 6px rgba(1, 139, 255, 0.16),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* 拖拽 / 搜寻时暂停呼吸，避免与其它动画叠加抖动 */
+.neo-node.is-primary.dragging,
+.neo-stage.seeking .neo-node.is-primary {
+  animation: none;
+}
+
+/* ---- 3) 悬浮升起：鼠标移入时轻微上浮 + 阴影加深 ---- */
+@media (hover: hover) {
+  .neo-node:not(.dragging):not(.is-primary):hover {
+    transform: translate(-50%, -50%) scale(1.05) translateY(-2px);
+    box-shadow:
+      0 12px 26px rgba(47, 116, 200, 0.38),
+      0 0 0 3px rgba(1, 139, 255, 0.18),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+    transition:
+      transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+      box-shadow 0.22s ease;
+  }
+
+  .neo-node.is-primary:hover {
+    transform: translate(-50%, -50%) scale(1.04);
+  }
+}
+
+/* ---- 4) 连线流光增强：更亮的粒子 + 双色流动 ---- */
+.neo-edge-flow {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 3px rgba(120, 190, 255, 0.65));
+}
+
+.edge-active .neo-edge-flow {
+  filter: drop-shadow(0 0 5px rgba(140, 200, 255, 0.9));
+}
+
+/* ---- 5) 背景缓漂光斑：两团柔光缓慢游动 ---- */
+.neo-stage::before,
+.neo-stage::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(40px);
+}
+
+.neo-stage::before {
+  width: 45%;
+  height: 45%;
+  left: -10%;
+  top: -12%;
+  background: radial-gradient(
+    circle,
+    rgba(120, 190, 255, 0.22),
+    transparent 70%
+  );
+  animation: neo-drift-a 26s ease-in-out infinite alternate;
+}
+
+.neo-stage::after {
+  width: 50%;
+  height: 50%;
+  right: -14%;
+  bottom: -16%;
+  background: radial-gradient(
+    circle,
+    rgba(160, 210, 255, 0.18),
+    transparent 70%
+  );
+  animation: neo-drift-b 32s ease-in-out infinite alternate;
+}
+
+@keyframes neo-drift-a {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(60px, 44px) scale(1.15);
+  }
+}
+
+@keyframes neo-drift-b {
+  from {
+    transform: translate(0, 0) scale(1.1);
+  }
+  to {
+    transform: translate(-70px, -50px) scale(0.95);
+  }
+}
+
+/* 拖拽画布时暂停漂移，避免视觉干扰 */
+.neo-stage.panning::before,
+.neo-stage.panning::after,
+.neo-stage.dragging-node::before,
+.neo-stage.dragging-node::after {
+  animation-play-state: paused;
+}
+
+/* ---- 6) 选中光环：旋转的虚线圆环 ---- */
+.neo-node.selected::marker {
+  content: none;
+}
+
+.neo-node.selected .node-ripple {
+  border-style: dashed;
+  border-color: rgba(1, 139, 255, 0.75);
+  animation:
+    node-ripple 3s cubic-bezier(0.15, 0.55, 0.3, 1) infinite,
+    neo-ring-spin 6s linear infinite;
+}
+
+@keyframes neo-ring-spin {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* ---- 点击瞬间：快速收缩反馈 ---- */
+.neo-node:active .node-ripple {
+  animation-duration: 0.9s;
+}
