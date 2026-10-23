@@ -36,3 +36,7 @@ backend/.env
 .DS_Store
 Thumbs.db
 *.log
+
+# 本地 SSL 证书（Steam++ 加速器专用，勿提交）
+.git-ca-bundle.crt
+.steamtools-ca.pem
