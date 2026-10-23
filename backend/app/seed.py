@@ -423,40 +423,84 @@ DEMO_VIDEO_DIR = Path(__file__).resolve().parent.parent / "uploads" / "courses" 
 DEMO_VIDEO_SECONDS = 10
 
 
-def _ensure_lessons(db: Session, course: Course) -> None:
-    """给没有课时的课程补一套演示课时；每个付费课程第 1 节可试看。"""
-    if db.query(Lesson.id).filter(Lesson.course_id == course.id).first():
-        return
-    if course.course_type == "intro":
-        rows = [
-            ("COPD 是什么、危险因素有哪些", 480),
-            ("这门课能帮你做什么、何时必须就医", 600),
-        ]
-        for index, (title, duration) in enumerate(rows, start=1):
-            db.add(
-                Lesson(
-                    course_id=course.id,
-                    title=f"{course.name} · {title}",
-                    summary="",
-                    video_url="",
-                    duration_seconds=duration,
-                    sort_order=index,
-                    is_trial=True,
-                )
-            )
-        return
+LEGACY_PAID_TITLES = {"课程导览与学习目标", "核心知识点讲解", "日常执行清单与自测"}
 
-    rows = [
-        ("课程导览与学习目标", 480, True),
-        ("核心知识点讲解", 720, False),
-        ("日常执行清单与自测", 540, False),
-    ]
-    for index, (title, duration, trial) in enumerate(rows, start=1):
+
+def _add_lesson_rows(db: Session, course: Course, rows) -> None:
+    """按 (title, duration, summary, is_trial) 元组批量写入课时。"""
+    for index, (title, duration, summary, trial) in enumerate(rows, start=1):
         db.add(
             Lesson(
                 course_id=course.id,
                 title=title,
-                summary="",
+                summary=summary,
+                video_url="",
+                duration_seconds=duration,
+                sort_order=index,
+                is_trial=trial,
+            )
+        )
+
+
+def _replace_lessons(db: Session, course: Course) -> None:
+    """删除课程现有课时（含学习进度），用于用真实内容替换旧占位课时。"""
+    db.query(LessonProgress).filter(LessonProgress.course_id == course.id).delete(
+        synchronize_session=False
+    )
+    db.query(Lesson).filter(Lesson.course_id == course.id).delete(
+        synchronize_session=False
+    )
+
+
+def _ensure_lessons(db: Session, course: Course) -> None:
+    """给没有课时的课程补一套课时；每个付费课程第 1 节可试看。
+
+    依据《商业医疗APP技术说明》：免费入门课 2–3 节、每个付费板块 6–8 节、
+    每节 8–12 分钟并配 3–5 条要点（见 course_content.py）。
+    若课程已有课时但仍是旧版三节占位课，则用真实内容替换。
+    """
+    from . import course_content
+
+    rows = course_content.lessons_for(course.name)
+
+    existing = (
+        db.query(Lesson)
+        .filter(Lesson.course_id == course.id)
+        .order_by(Lesson.sort_order, Lesson.id)
+        .all()
+    )
+    if existing:
+        # 仍是旧版占位课时且已有真实内容 → 替换
+        if rows:
+            if course.course_type == "intro":
+                is_legacy = all(
+                    any(l.title.endswith(sfx) for sfx in course_content.LEGACY_INTRO_SUFFIXES)
+                    for l in existing
+                )
+            else:
+                is_legacy = {l.title for l in existing} == course_content.LEGACY_PAID_TITLES
+            if is_legacy:
+                _replace_lessons(db, course)
+                _add_lesson_rows(db, course, rows)
+                db.commit()
+        return
+
+    if rows:
+        _add_lesson_rows(db, course, rows)
+        return
+
+    # 未配置内容的课程：退回通用三节占位
+    generic = [
+        ("课程导览与学习目标", 480, "· 本课学习目标与内容导览", True),
+        ("核心知识点讲解", 720, "· 核心知识点讲解", False),
+        ("日常执行清单与自测", 540, "· 日常执行清单与自测", False),
+    ]
+    for index, (title, duration, summary, trial) in enumerate(generic, start=1):
+        db.add(
+            Lesson(
+                course_id=course.id,
+                title=title,
+                summary=summary,
                 video_url="",
                 duration_seconds=duration,
                 sort_order=index,
