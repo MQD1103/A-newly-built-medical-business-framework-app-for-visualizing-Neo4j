@@ -3445,3 +3445,142 @@ textarea:focus {
 .neo-node:active .node-ripple {
   animation-duration: 0.9s;
 }
+
+/* ---------- 商城首页（蓝色主题 · 干净 · 文字为主）---------- */
+.mall-hero {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(150deg, rgba(232, 243, 255, 0.9), rgba(255, 255, 255, 0.96) 62%),
+    var(--blue-wash);
+  padding: 22px 18px 18px;
+}
+
+.mall-hero h2 {
+  margin: 0 0 8px;
+  font-size: 1.3rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.mall-hero p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: #5a6d82;
+  max-width: 34em;
+}
+
+.mall-hero-stats {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.mall-hero-stats > div {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 6px 12px;
+  text-align: center;
+}
+
+.mall-hero-stats strong {
+  display: block;
+  font-size: 1.15rem;
+  color: var(--blue-deep);
+  letter-spacing: 0.01em;
+}
+
+.mall-hero-stats span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.mall-section-label {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* 入口卡片：图标 + 标题 + 数量标签 */
+.hub-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.hub-card-top strong {
+  margin-bottom: 0;
+}
+
+.hub-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  flex: none;
+}
+
+.hub-card-tag {
+  margin-left: auto;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--blue-deep);
+  background: var(--blue-soft);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* 特色说明区 */
+.mall-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.mall-feature {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 12px 12px;
+}
+
+.mall-feature strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--blue-deep);
+  margin-bottom: 6px;
+}
+
+.mall-feature p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #5a6d82;
+}
+
+.mall-footnote {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 420px) {
+  .mall-features {
+    grid-template-columns: 1fr;
+  }
+}
