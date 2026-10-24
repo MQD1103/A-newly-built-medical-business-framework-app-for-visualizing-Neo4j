@@ -111,7 +111,8 @@ export default function ServiceShop() {
         </div>
       </div>
 
-      <section className="mall-hero">
+      <section className="mall-hero hero-pattern">
+        <div className="hero-pattern-deco" aria-hidden="true" />
         <h2>医护跟进，随时在线</h2>
         <p>
           {isAdmin

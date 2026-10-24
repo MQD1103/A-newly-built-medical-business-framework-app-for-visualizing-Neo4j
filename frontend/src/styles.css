@@ -3590,3 +3590,27 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- 服务页横幅花纹（医疗十字 + 圆点 + 底部波浪）---------- */
+.mall-hero.hero-pattern {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-pattern-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cpath d='M30 22h6v6h6v6h-6v6h-6v-6h-6v-6h6z' fill='%233b86e0' fill-opacity='0.05'/%3E%3Ccircle cx='60' cy='60' r='2' fill='%233b86e0' fill-opacity='0.05'/%3E%3Ccircle cx='6' cy='54' r='1.6' fill='%233b86e0' fill-opacity='0.04'/%3E%3C/svg%3E")
+      repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='34' viewBox='0 0 220 34'%3E%3Cpath d='M0 24 Q 27.5 8 55 24 T 110 24 T 165 24 T 220 24' fill='none' stroke='%233b86e0' stroke-opacity='0.08' stroke-width='1.5'/%3E%3C/svg%3E")
+      repeat-x bottom left / 220px 34px;
+}
+
+.hero-pattern-deco + h2,
+.hero-pattern-deco ~ p,
+.hero-pattern-deco ~ .mall-hero-stats {
+  position: relative;
+  z-index: 1;
+}
