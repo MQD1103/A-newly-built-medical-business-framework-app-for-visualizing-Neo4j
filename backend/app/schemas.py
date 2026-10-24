@@ -670,6 +670,38 @@ class CourseProgressOut(BaseModel):
 # ---------- 商城：商品、订单、退款（routers/mall.py）----------
 
 
+# ---------- 板块测验（routers/courses.py）----------
+
+
+class QuizQuestionOut(BaseModel):
+    """下发给前端的题目：不带答案，防作弊。"""
+
+    id: int
+    question: str
+    options: list[str] = Field(default_factory=list)
+
+
+class QuizSubmitIn(BaseModel):
+    # {题目id: 选择的选项下标}
+    answers: dict[int, int] = Field(default_factory=dict)
+
+
+class QuizDetailOut(BaseModel):
+    question_id: int
+    question: str
+    chosen: int
+    answer_index: int
+    correct: bool
+    explanation: str = ""
+
+
+class QuizResultOut(BaseModel):
+    course_id: int
+    score: int
+    total: int
+    details: list[QuizDetailOut] = Field(default_factory=list)
+
+
 class MallIncludedCourseOut(BaseModel):
     id: int
     name: str

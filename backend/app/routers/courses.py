@@ -4,6 +4,8 @@
 这里保留前端正在使用的接口形状，并补充课时与进度接口。
 """
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,8 @@ from ..models import (
     Enrollment,
     Lesson,
     LessonProgress,
+    QuizAttempt,
+    QuizQuestion,
     User,
 )
 from ..schemas import (
@@ -33,6 +37,10 @@ from ..schemas import (
     LessonProgressIn,
     LessonProgressOut,
     LessonUpdate,
+    QuizDetailOut,
+    QuizQuestionOut,
+    QuizResultOut,
+    QuizSubmitIn,
 )
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
@@ -458,6 +466,92 @@ def get_course_progress(
         paid_completed=progress["paid_completed"],
         paid_percent=progress["paid_percent"],
         lessons=items,
+    )
+
+
+# ---------- 板块测验 ----------
+
+
+@router.get("/{course_id}/quiz", response_model=list[QuizQuestionOut])
+def get_quiz(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """获取某门课的测验题（不返回答案）。"""
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    questions = (
+        db.query(QuizQuestion)
+        .filter(QuizQuestion.course_id == course_id)
+        .order_by(QuizQuestion.sort_order, QuizQuestion.id)
+        .all()
+    )
+    return [
+        QuizQuestionOut(
+            id=q.id,
+            question=q.question,
+            options=json.loads(q.options or "[]"),
+        )
+        for q in questions
+    ]
+
+
+@router.post("/{course_id}/quiz", response_model=QuizResultOut)
+def submit_quiz(
+    course_id: int,
+    payload: QuizSubmitIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """提交答案：后端判分、返回对错与解析，并保存一次作答记录。"""
+    course = db.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    questions = (
+        db.query(QuizQuestion)
+        .filter(QuizQuestion.course_id == course_id)
+        .order_by(QuizQuestion.sort_order, QuizQuestion.id)
+        .all()
+    )
+    if not questions:
+        raise HTTPException(status_code=404, detail="该课程暂未配置测验题")
+
+    details: list[QuizDetailOut] = []
+    answers_record: list[dict] = []
+    score = 0
+    for q in questions:
+        chosen = payload.answers.get(q.id, -1)
+        correct = chosen == q.answer_index
+        if correct:
+            score += 1
+        details.append(
+            QuizDetailOut(
+                question_id=q.id,
+                question=q.question,
+                chosen=chosen,
+                answer_index=q.answer_index,
+                correct=correct,
+                explanation=q.explanation or "",
+            )
+        )
+        answers_record.append(
+            {"question_id": q.id, "chosen": chosen, "correct": correct}
+        )
+
+    db.add(
+        QuizAttempt(
+            user_id=user.id,
+            course_id=course_id,
+            score=score,
+            total=len(questions),
+            answers_json=json.dumps(answers_record, ensure_ascii=False),
+        )
+    )
+    db.commit()
+    return QuizResultOut(
+        course_id=course_id, score=score, total=len(questions), details=details
     )
 
 

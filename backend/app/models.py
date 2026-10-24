@@ -781,3 +781,39 @@ class MedicationCheck(Base):
 
     user: Mapped[User] = relationship()
     lesson: Mapped[Lesson | None] = relationship()
+
+
+class QuizQuestion(Base):
+    """板块测验选择题（每门课一组，答完即时判分并给解析）。"""
+
+    __tablename__ = "quiz_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    # JSON 数组字符串，如 ["选项A", "选项B", "选项C", "选项D"]
+    options: Mapped[str] = mapped_column(Text, default="[]")
+    # 正确选项下标（0 = 第一个选项）
+    answer_index: Mapped[int] = mapped_column(Integer, default=0)
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class QuizAttempt(Base):
+    """用户一次测验的作答记录（用于错题回看与历史成绩）。"""
+
+    __tablename__ = "quiz_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    # JSON 数组：[{"question_id": 1, "chosen": 2, "correct": true}, ...]
+    answers_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+
+    user: Mapped[User] = relationship()
+    course: Mapped[Course] = relationship()

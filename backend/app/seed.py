@@ -1,9 +1,11 @@
+import json
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from .auth import hash_password
+from .quiz_content import QUIZ_QUESTIONS
 from .models import (
     CalendarEvent,
     CommunityPost,
@@ -18,6 +20,7 @@ from .models import (
     Lesson,
     LessonProgress,
     Notice,
+    QuizQuestion,
     Reminder,
     ScheduleSlot,
     ServiceProduct,
@@ -688,6 +691,35 @@ def ensure_demo_hospital(db: Session) -> None:
     db.commit()
 
 
+def ensure_quiz_questions(db: Session) -> None:
+    """为付费课灌入板块测验题（已有题目则跳过，可安全重复执行）。"""
+    added = 0
+    for course_name, questions in QUIZ_QUESTIONS.items():
+        course = db.query(Course).filter(Course.name == course_name).first()
+        if not course:
+            continue
+        existing = (
+            db.query(QuizQuestion).filter(QuizQuestion.course_id == course.id).count()
+        )
+        if existing > 0:
+            continue
+        for sort_order, (q, options, answer_index, explanation) in enumerate(questions):
+            db.add(
+                QuizQuestion(
+                    course_id=course.id,
+                    question=q,
+                    options=json.dumps(options, ensure_ascii=False),
+                    answer_index=answer_index,
+                    explanation=explanation,
+                    sort_order=sort_order,
+                )
+            )
+            added += 1
+    if added:
+        db.commit()
+        print(f"已灌入板块测验题 {added} 道。", flush=True)
+
+
 def seed_if_empty(db: Session) -> None:
     ensure_demo_hospital(db)
     if db.query(User).first():
@@ -698,6 +730,7 @@ def seed_if_empty(db: Session) -> None:
         ensure_demo_service_products(db)
         ensure_extra_admin(db)
         ensure_mall_catalog(db)
+        ensure_quiz_questions(db)
         return
 
     admin = User(
@@ -931,3 +964,4 @@ def seed_if_empty(db: Session) -> None:
     db.commit()
     ensure_extra_admin(db)
     ensure_mall_catalog(db)
+    ensure_quiz_questions(db)

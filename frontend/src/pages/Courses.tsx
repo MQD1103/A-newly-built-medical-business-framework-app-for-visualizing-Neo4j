@@ -20,6 +20,30 @@ function durationLabel(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
 }
 
+/** 板块测验的题目（后端不下发答案） */
+interface QuizQuestion {
+  id: number
+  question: string
+  options: string[]
+}
+
+/** 提交后后端返回的判分结果 */
+interface QuizResult {
+  course_id: number
+  score: number
+  total: number
+  details: {
+    question_id: number
+    question: string
+    chosen: number
+    answer_index: number
+    correct: boolean
+    explanation: string
+  }[]
+}
+
+const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
+
 export default function Courses() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,6 +59,15 @@ export default function Courses() {
   const [activeLessonId, setActiveLessonId] = useState<number | null>(null)
   const [lessonError, setLessonError] = useState('')
   const [marking, setMarking] = useState(false)
+
+  // 板块测验状态
+  const [quizOpen, setQuizOpen] = useState(false)
+  const [quizLoading, setQuizLoading] = useState(false)
+  const [quizError, setQuizError] = useState('')
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({})
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
+  const [quizSubmitting, setQuizSubmitting] = useState(false)
 
   const isAdmin = user?.role === 'admin'
 
@@ -79,13 +112,30 @@ export default function Courses() {
     setLessonData(null)
     setLessonError('')
     api<CourseLessons>(`/api/courses/${activeId}/lessons`)
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return
         setLessonData(data)
+        // 续播：优先选第一个「未学完且未锁定」的课时，学完则回第 1 节
+        let resumeId: number | null = null
+        try {
+          const progress = await api<{
+            lessons: { lesson_id: number; completed: boolean }[]
+          }>(`/api/courses/${activeId}/progress`)
+          if (cancelled) return
+          const completed = new Set(
+            progress.lessons.filter((x) => x.completed).map((x) => x.lesson_id),
+          )
+          resumeId =
+            data.lessons.find((x) => !x.locked && !completed.has(x.id))?.id ??
+            null
+        } catch {
+          // 进度接口失败不阻塞，退回默认选课逻辑
+        }
         setActiveLessonId((current) => {
           const same = data.lessons.find((x) => x.id === current)
           if (same && !same.locked) return current
           return (
+            resumeId ??
             data.lessons.find((x) => !x.locked)?.id ??
             data.lessons[0]?.id ??
             null
@@ -127,7 +177,53 @@ export default function Courses() {
   function selectCourse(id: number) {
     setActiveId(id)
     setPayTip('')
+    // 切换课程时清空测验状态
+    setQuizOpen(false)
+    setQuizQuestions([])
+    setQuizAnswers({})
+    setQuizResult(null)
+    setQuizError('')
     setSearchParams(id ? { id: String(id) } : {})
+  }
+
+  async function openQuiz() {
+    if (!active || quizLoading) return
+    setQuizOpen(true)
+    setQuizLoading(true)
+    setQuizError('')
+    try {
+      const questions = await api<QuizQuestion[]>(
+        `/api/courses/${active.id}/quiz`,
+      )
+      setQuizQuestions(questions)
+      setQuizAnswers({})
+      setQuizResult(null)
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : '测验题加载失败')
+    } finally {
+      setQuizLoading(false)
+    }
+  }
+
+  async function submitQuiz() {
+    if (!active || quizSubmitting) return
+    if (quizQuestions.some((q) => quizAnswers[q.id] == null)) {
+      setQuizError('还有题目没作答，全部选完再交卷哦')
+      return
+    }
+    setQuizSubmitting(true)
+    setQuizError('')
+    try {
+      const result = await api<QuizResult>(`/api/courses/${active.id}/quiz`, {
+        method: 'POST',
+        body: JSON.stringify({ answers: quizAnswers }),
+      })
+      setQuizResult(result)
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : '提交失败')
+    } finally {
+      setQuizSubmitting(false)
+    }
   }
 
   async function onPurchase() {
@@ -372,6 +468,145 @@ export default function Courses() {
                       {marking ? '记录中…' : '标记本节已学完'}
                     </button>
                   ) : null}
+                </>
+              )}
+            </section>
+          )}
+
+          {(active?.enrolled || isAdmin) && (
+            <section className="item-card quiz-section">
+              <div className="lesson-head">
+                <h3 className="section-label">板块测验</h3>
+                {quizResult ? (
+                  <span className="lesson-count">
+                    得分 {quizResult.score}/{quizResult.total}
+                  </span>
+                ) : null}
+              </div>
+
+              {!quizOpen ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  学完本课程后，来做几道题检验一下学习效果吧。
+                  <button
+                    type="button"
+                    className="btn small"
+                    style={{ marginLeft: 10 }}
+                    onClick={() => void openQuiz()}
+                  >
+                    开始测验
+                  </button>
+                </p>
+              ) : quizLoading ? (
+                <p className="muted">题目加载中…</p>
+              ) : quizError && quizQuestions.length === 0 ? (
+                <p className="error">{quizError}</p>
+              ) : quizQuestions.length === 0 ? (
+                <p className="muted">该课程暂未配置测验题</p>
+              ) : (
+                <>
+                  {quizError ? <p className="error">{quizError}</p> : null}
+                  {quizResult ? (
+                    <>
+                      <p
+                        className={
+                          quizResult.score === quizResult.total
+                            ? 'ok-tip'
+                            : 'error'
+                        }
+                      >
+                        {quizResult.score === quizResult.total
+                          ? `🎉 全部答对！${quizResult.score}/${quizResult.total} 分`
+                          : `本次得分 ${quizResult.score}/${quizResult.total}，错的题看下方解析回看课时。`}
+                      </p>
+                      <ul className="quiz-list">
+                        {quizResult.details.map((d, i) => (
+                          <li key={d.question_id} className="quiz-item">
+                            <strong>
+                              {i + 1}. {d.question}
+                            </strong>
+                            <p
+                              className="meta"
+                              style={{
+                                color: d.correct ? '#2e7d32' : '#c62828',
+                                margin: '4px 0',
+                              }}
+                            >
+                              你的答案：
+                              {d.chosen >= 0
+                                ? OPTION_LABELS[d.chosen] ?? d.chosen
+                                : '未答'}
+                              {d.correct ? ' ✓ 正确' : ` ✗ 正确答案：${OPTION_LABELS[d.answer_index]}`}
+                            </p>
+                            {d.explanation ? (
+                              <p className="meta" style={{ margin: 0 }}>
+                                解析：{d.explanation}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        className="btn small"
+                        onClick={() => void openQuiz()}
+                      >
+                        重新测验
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <ul className="quiz-list">
+                        {quizQuestions.map((q, qi) => (
+                          <li key={q.id} className="quiz-item">
+                            <strong>
+                              {qi + 1}. {q.question}
+                            </strong>
+                            <div className="quiz-options">
+                              {q.options.map((opt, oi) => (
+                                <label
+                                  key={oi}
+                                  className={`quiz-option${
+                                    quizAnswers[q.id] === oi ? ' active' : ''
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`quiz-${q.id}`}
+                                    checked={quizAnswers[q.id] === oi}
+                                    onChange={() =>
+                                      setQuizAnswers((prev) => ({
+                                        ...prev,
+                                        [q.id]: oi,
+                                      }))
+                                    }
+                                  />
+                                  <span>
+                                    {OPTION_LABELS[oi] ?? oi}. {opt}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        className="btn primary small"
+                        disabled={quizSubmitting}
+                        onClick={() => void submitQuiz()}
+                      >
+                        {quizSubmitting ? '判分中…' : '交卷'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn small"
+                        style={{ marginLeft: 8 }}
+                        onClick={() => setQuizOpen(false)}
+                      >
+                        收起
+                      </button>
+                    </>
+                  )}
                 </>
               )}
             </section>
