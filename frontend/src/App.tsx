@@ -3,10 +3,12 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import Layout from './components/Layout'
 import AdminUser from './pages/AdminUser'
+import AiCheck from './pages/AiCheck'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
 import Friends from './pages/Friends'
 import Home from './pages/Home'
+import Hospital from './pages/Hospital'
 import LinkedInfo from './pages/LinkedInfo'
 import Login from './pages/Login'
 import Mall from './pages/Mall'
@@ -15,6 +17,8 @@ import Materials from './pages/Materials'
 import Me from './pages/Me'
 import NoticeDetail from './pages/NoticeDetail'
 import Notices from './pages/Notices'
+import Notifications from './pages/Notifications'
+import Orders from './pages/Orders'
 import ProfileEdit from './pages/ProfileEdit'
 import Reminders from './pages/Reminders'
 import Schedule from './pages/Schedule'
@@ -22,6 +26,7 @@ import Scores from './pages/Scores'
 import ServiceShop from './pages/ServiceShop'
 import Services from './pages/Services'
 import Supervision from './pages/Supervision'
+import SymptomDiary from './pages/SymptomDiary'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -53,11 +58,16 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="notices" element={<Notices />} />
         <Route path="notices/:id" element={<NoticeDetail />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="reminders" element={<Reminders />} />
         <Route path="community" element={<Community />} />
         <Route path="friends" element={<Friends />} />
         <Route path="mall" element={<Mall />} />
+        <Route path="orders" element={<Orders />} />
         <Route path="services" element={<Services />} />
+        <Route path="hospital" element={<Hospital />} />
+        <Route path="ai-check" element={<AiCheck />} />
+        <Route path="symptom-diary" element={<SymptomDiary />} />
         <Route path="courses" element={<Courses />} />
         <Route path="service-shop" element={<ServiceShop />} />
         <Route path="supervision" element={<Supervision />} />

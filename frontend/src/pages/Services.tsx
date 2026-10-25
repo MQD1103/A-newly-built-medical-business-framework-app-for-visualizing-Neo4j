@@ -10,7 +10,37 @@ const entries = [
   {
     to: '/reminders',
     title: '提醒',
-    desc: '个人与管理提醒、截止倒计时',
+    desc: '用药、复查提醒与截止倒计时',
+    tone: 'b' as const,
+  },
+  {
+    to: '/notifications',
+    title: '消息通知',
+    desc: '开启手机通知，提醒直接推送到通知栏',
+    tone: 'b' as const,
+  },
+  {
+    to: '/symptom-diary',
+    title: '症状日记',
+    desc: '记录咳嗽、气短与痰量变化',
+    tone: 'a' as const,
+  },
+  {
+    to: '/ai-check',
+    title: '用药动作检测',
+    desc: '拍摄用药过程，检查步骤是否完成',
+    tone: 'b' as const,
+  },
+  {
+    to: '/hospital',
+    title: '医院资料',
+    desc: '授权后只读查看病情资料与医生嘱托',
+    tone: 'a' as const,
+  },
+  {
+    to: '/orders',
+    title: '我的订单',
+    desc: '我的课程、订单、退款与团购兑换',
     tone: 'b' as const,
   },
   {

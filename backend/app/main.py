@@ -30,6 +30,7 @@ from .routers import (
     reminders,
     schedule,
     service_products,
+    symptoms,
     users,
 )
 from .schema_migrate import ensure_schema
@@ -100,6 +101,7 @@ app.include_router(grades.router)
 app.include_router(links.router)
 app.include_router(hospital.router)
 app.include_router(ai.router)
+app.include_router(symptoms.router)
 app.include_router(home.router)
 app.include_router(admin.router)
 

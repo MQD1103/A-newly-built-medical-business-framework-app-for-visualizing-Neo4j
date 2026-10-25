@@ -39,6 +39,7 @@ def to_out(row: MedicationCheck) -> MedicationCheckOut:
         lesson_id=row.lesson_id,
         status=row.status or "completed",
         provider=row.provider or "demo",
+        mode=row.mode or "oral",
         steps=[
             MedicationStepOut(name=str(item.get("name") or ""), done=bool(item.get("done")))
             for item in service.steps_from_json(row.steps_json)
@@ -62,9 +63,14 @@ def _provider_name() -> str:
 def analyze_medication(
     file: UploadFile = File(...),
     lesson_id: int | None = Form(default=None),
+    mode: str = Form(default="oral"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    mode = (mode or "oral").strip().lower()
+    if mode not in ("oral", "inhale"):
+        raise HTTPException(status_code=400, detail="请选择用药方式：口服或吸入")
+
     key = f"ai:medication:{user.id}"
     wait = detection_limiter.retry_after(key)
     if wait:
@@ -93,7 +99,9 @@ def analyze_medication(
 
     current = service.now()
     try:
-        steps, needs_retry, message, provider = service.detect(data, image_type, lesson_id)
+        steps, needs_retry, message, provider = service.detect(
+            data, image_type, lesson_id, mode
+        )
     except service.DetectionError as exc:
         # 失败也留一条脱敏摘要，便于用户回看“这次为什么失败”，不保存图片
         failed = MedicationCheck(
@@ -101,6 +109,7 @@ def analyze_medication(
             lesson_id=lesson_id,
             status="failed",
             provider=_provider_name(),
+            mode=mode,
             steps_json="[]",
             needs_retry=True,
             message=exc.message,
@@ -119,6 +128,7 @@ def analyze_medication(
         lesson_id=lesson_id,
         status="completed",
         provider=provider,
+        mode=mode,
         steps_json=service.steps_to_json(steps),
         needs_retry=needs_retry,
         message=message,

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from . import push_service
 from .database import SessionLocal
 from .models import (
     CourseBundleItem,
@@ -220,6 +221,14 @@ def run_scan() -> int:
     try:
         count = sync_due_notifications(db)
         db.commit()
+        # 站内通知落库后投递到手机；单次失败不影响下一轮提醒扫描
+        try:
+            delivered = push_service.deliver_pending(db)
+            if delivered:
+                logger.info("手机推送投递 %s 条", delivered)
+        except Exception:
+            logger.exception("手机推送投递失败")
+            db.rollback()
         return count
     except IntegrityError:
         # 多进程/多实例同时扫描时由唯一约束兜底

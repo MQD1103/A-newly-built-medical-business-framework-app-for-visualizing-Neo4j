@@ -268,6 +268,20 @@ class Reminder(Base):
     )
     # user=个人添加；manager=教师/管理员；system=系统种子
     source: Mapped[str] = mapped_column(String(20), default="manager", index=True)
+    # general=普通事项；medication=用药/吸入提醒；checkup=复查/检查提醒
+    kind: Mapped[str] = mapped_column(String(20), default="general", index=True)
+    # 用药提醒：药名与剂量/用法（如“布地奈德 · 每次 1 吸”）
+    drug_name: Mapped[str] = mapped_column(String(120), default="")
+    dosage: Mapped[str] = mapped_column(String(120), default="")
+    # none / daily / weekly：完成后自动生成下一周期的提醒
+    repeat_rule: Mapped[str] = mapped_column(String(20), default="none")
+    # 检查提醒：检查类型与就诊前可准备的问题
+    check_type: Mapped[str] = mapped_column(String(120), default="")
+    prep_questions: Mapped[str] = mapped_column(Text, default="")
+    # 重复提醒生成下一周期时，指回最初那条提醒
+    recurring_parent_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped[Course] = relationship(back_populates="reminders")
@@ -634,6 +648,54 @@ class Notification(Base):
     course: Mapped[Course | None] = relationship()
 
 
+class PushSubscription(Base):
+    """用户设备（浏览器）的 Web Push 订阅。
+
+    endpoint 由浏览器推送服务下发，同一设备重复授权时按 endpoint 覆盖。
+    这里只保存投递所需的技术参数，不保存病历、用药等业务内容。
+    """
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_push_endpoint"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(500))
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    user_agent: Mapped[str] = mapped_column(String(300), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    # 只记录简短错误描述，不记录完整 endpoint（endpoint 本身可作为推送凭据）
+    last_error: Mapped[str] = mapped_column(String(300), default="")
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()
+
+
+class PushDelivery(Base):
+    """站内通知的推送投递记录，保证同一条通知只推一次。"""
+
+    __tablename__ = "push_deliveries"
+    __table_args__ = (
+        UniqueConstraint("notification_id", name="uq_push_delivery_notification"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    notification_id: Mapped[int] = mapped_column(
+        ForeignKey("notifications.id"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # sent=至少一台设备成功；failed=尝试过但失败；skipped=无订阅/未启用
+    status: Mapped[str] = mapped_column(String(20), default="skipped")
+    detail: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class HospitalPartner(Base):
     """已开通的合作医院。
 
@@ -765,6 +827,8 @@ class MedicationCheck(Base):
     lesson_id: Mapped[int | None] = mapped_column(
         ForeignKey("lessons.id"), nullable=True, index=True, default=None
     )
+    # oral=口服，inhale=吸入；仅用于选择对应的演示/检测步骤
+    mode: Mapped[str] = mapped_column(String(20), default="oral")
     # completed=检测完成；failed=检测服务异常，仅保留错误摘要
     status: Mapped[str] = mapped_column(String(20), default="completed", index=True)
     provider: Mapped[str] = mapped_column(String(20), default="demo")
@@ -796,7 +860,13 @@ class QuizQuestion(Base):
     # 正确选项下标（0 = 第一个选项）
     answer_index: Mapped[int] = mapped_column(Integer, default=0)
     explanation: Mapped[str] = mapped_column(Text, default="")
+    # 错题回看对应的课时；旧数据可为空
+    lesson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lessons.id"), nullable=True, index=True, default=None
+    )
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    lesson: Mapped[Lesson | None] = relationship()
 
 
 class QuizAttempt(Base):
@@ -817,3 +887,26 @@ class QuizAttempt(Base):
 
     user: Mapped[User] = relationship()
     course: Mapped[Course] = relationship()
+
+
+class SymptomEntry(Base):
+    """症状日记：每天一条，记录咳嗽 / 气短 / 痰量 0–3 级。"""
+
+    __tablename__ = "symptom_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "record_date", name="uq_symptom_user_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    record_date: Mapped[date] = mapped_column(Date, index=True)
+    cough: Mapped[int] = mapped_column(Integer, default=0)
+    dyspnea: Mapped[int] = mapped_column(Integer, default=0)
+    sputum: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()

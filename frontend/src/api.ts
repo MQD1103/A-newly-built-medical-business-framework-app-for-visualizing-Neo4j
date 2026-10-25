@@ -70,12 +70,20 @@ export async function api<T>(
 }
 
 /** 上传文件（FormData，不强制 JSON Content-Type） */
-export async function apiUpload<T>(path: string, file: File): Promise<T> {
+export async function apiUpload<T>(
+  path: string,
+  file: Blob,
+  fields?: Record<string, string>,
+  filename = 'upload.jpg',
+): Promise<T> {
   const headers = new Headers()
   const token = getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const form = new FormData()
-  form.append('file', file)
+  form.append('file', file, filename)
+  if (fields) {
+    for (const [key, value] of Object.entries(fields)) form.append(key, value)
+  }
   const res = await fetch(apiUrl(path), { method: 'POST', headers, body: form })
   if (!res.ok) {
     let detail = res.statusText

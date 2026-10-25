@@ -109,6 +109,8 @@ backend\.venv\Scripts\python.exe backend\scripts\generate_demo_videos.py ^
 - 商城：免费入门 / 单课 / 整包、试看、课时进度、订单支付、
   7 天内且进度低于 20% 退款、补差价升级、团购激活码、服务商品
 - 站内通知：提醒 7 天 / 1 天 / 到期三档自动触达，支持按人完成、通知开关、已读
+- 手机通知：用户授权后推送到手机通知栏，点击回到对应页面；支持多设备、
+  测试通知、失效订阅自动清理（需 HTTPS，见通知文档）
 - 安全与运维：登录限流、JWT / 数据库环境变量、健康检查、脱敏访问日志、
   数据库备份与演示库重建；正式库可切换 MySQL 8（utf8mb4）
 - 医院对接：合作医院开通、用户授权、嘱托 / 病情 / 病历摘要只读缓存、
@@ -123,6 +125,8 @@ backend\.venv\Scripts\python.exe backend\scripts\generate_demo_videos.py ^
 [`docs/backend-operations.md`](docs/backend-operations.md)；
 医院对接与只读授权见
 [`docs/hospital-integration.md`](docs/hospital-integration.md)；
+手机通知的密钥配置、HTTPS 要求与接口见
+[`docs/mobile-notifications.md`](docs/mobile-notifications.md)；
 AI 用药检测的服务端约定见
 [`docs/ai-medication-check.md`](docs/ai-medication-check.md)；
 全部接口清单见 [`docs/api-reference.md`](docs/api-reference.md)

@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from .auth import hash_password
-from .quiz_content import QUIZ_QUESTIONS
+from .quiz_content import QUIZ_LESSON_HINTS, QUIZ_QUESTIONS
 from .models import (
     CalendarEvent,
     CommunityPost,
@@ -698,12 +698,49 @@ def ensure_quiz_questions(db: Session) -> None:
         course = db.query(Course).filter(Course.name == course_name).first()
         if not course:
             continue
-        existing = (
-            db.query(QuizQuestion).filter(QuizQuestion.course_id == course.id).count()
+        lessons = (
+            db.query(Lesson)
+            .filter(Lesson.course_id == course.id)
+            .order_by(Lesson.sort_order, Lesson.id)
+            .all()
         )
-        if existing > 0:
+        rows = (
+            db.query(QuizQuestion)
+            .filter(QuizQuestion.course_id == course.id)
+            .order_by(QuizQuestion.sort_order, QuizQuestion.id)
+            .all()
+        )
+        hints = QUIZ_LESSON_HINTS.get(course_name)
+        if rows:
+            # 旧库补「错题 → 课时」映射；已有映射若仍等于按题序的默认值，
+            # 则按内容提示纠正（管理员手工改过的不动）。
+            changed = False
+            for index, question in enumerate(rows):
+                if index >= len(lessons):
+                    break
+                default_id = lessons[index].id
+                if question.lesson_id is None:
+                    question.lesson_id = default_id
+                    changed = True
+                elif (
+                    hints
+                    and index < len(hints)
+                    and question.lesson_id == default_id
+                    and hints[index] < len(lessons)
+                ):
+                    target_id = lessons[hints[index]].id
+                    if target_id != question.lesson_id:
+                        question.lesson_id = target_id
+                        changed = True
+            if changed:
+                db.commit()
             continue
         for sort_order, (q, options, answer_index, explanation) in enumerate(questions):
+            lesson_index = (
+                hints[sort_order]
+                if hints and sort_order < len(hints)
+                else sort_order
+            )
             db.add(
                 QuizQuestion(
                     course_id=course.id,
@@ -711,6 +748,9 @@ def ensure_quiz_questions(db: Session) -> None:
                     options=json.dumps(options, ensure_ascii=False),
                     answer_index=answer_index,
                     explanation=explanation,
+                    lesson_id=lessons[lesson_index].id
+                    if lesson_index < len(lessons)
+                    else None,
                     sort_order=sort_order,
                 )
             )

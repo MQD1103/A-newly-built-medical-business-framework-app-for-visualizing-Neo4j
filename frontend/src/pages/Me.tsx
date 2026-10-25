@@ -84,6 +84,10 @@ export default function Me() {
           <span>修改资料</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/notifications" className="menu-row">
+          <span>消息通知</span>
+          <span className="chev">›</span>
+        </Link>
         <Link to="/notices" className="menu-row">
           <span>通知公告</span>
           <span className="chev">›</span>

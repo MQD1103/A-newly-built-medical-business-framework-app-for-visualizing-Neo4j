@@ -236,6 +236,13 @@ class ReminderCreate(BaseModel):
     due_at: datetime
     external_url: str = ""
     course_id: int | None = None
+    # general / medication / checkup
+    kind: str = Field(default="general", pattern="^(general|medication|checkup)$")
+    drug_name: str = Field(default="", max_length=120)
+    dosage: str = Field(default="", max_length=120)
+    repeat_rule: str = Field(default="none", pattern="^(none|daily|weekly)$")
+    check_type: str = Field(default="", max_length=120)
+    prep_questions: str = Field(default="", max_length=2000)
 
 
 class ReminderUpdate(BaseModel):
@@ -244,6 +251,12 @@ class ReminderUpdate(BaseModel):
     due_at: datetime | None = None
     external_url: str | None = None
     course_id: int | None = None
+    kind: str | None = Field(default=None, pattern="^(general|medication|checkup)$")
+    drug_name: str | None = Field(default=None, max_length=120)
+    dosage: str | None = Field(default=None, max_length=120)
+    repeat_rule: str | None = Field(default=None, pattern="^(none|daily|weekly)$")
+    check_type: str | None = Field(default=None, max_length=120)
+    prep_questions: str | None = Field(default=None, max_length=2000)
 
 
 class ReminderNotifyUpdate(BaseModel):
@@ -276,6 +289,14 @@ class ReminderOut(BaseModel):
     completed_at: datetime | None = None
     can_delete: bool = False
     can_edit: bool = False
+    # 服务化提醒字段
+    kind: str = "general"
+    drug_name: str = ""
+    dosage: str = ""
+    repeat_rule: str = "none"
+    check_type: str = ""
+    prep_questions: str = ""
+    recurring_parent_id: int | None = None
 
 
 class NotificationOut(BaseModel):
@@ -292,6 +313,8 @@ class NotificationOut(BaseModel):
     created_at: datetime
     read_at: datetime | None = None
     read: bool = False
+    # 点击通知时打开的前端路径
+    click_url: str = ""
 
 
 class NotificationListOut(BaseModel):
@@ -300,6 +323,21 @@ class NotificationListOut(BaseModel):
     unread: int = 0
     page: int = 1
     page_size: int = 20
+
+
+class PushSubscriptionKeysIn(BaseModel):
+    p256dh: str = Field(min_length=20, max_length=200)
+    auth: str = Field(min_length=8, max_length=100)
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=500)
+    keys: PushSubscriptionKeysIn
+    user_agent: str = Field(default="", max_length=300)
+
+
+class PushUnsubscribeIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=500)
 
 
 class ScheduleSlotCreate(BaseModel):
@@ -693,6 +731,9 @@ class QuizDetailOut(BaseModel):
     answer_index: int
     correct: bool
     explanation: str = ""
+    # 错题可回看的课时；题库未关联课时时为空
+    lesson_id: int | None = None
+    lesson_title: str = ""
 
 
 class QuizResultOut(BaseModel):
@@ -1008,6 +1049,8 @@ class MedicationCheckOut(BaseModel):
     lesson_id: int | None = None
     status: str = "completed"
     provider: str = "demo"
+    # oral=口服，inhale=吸入
+    mode: str = "oral"
     steps: list[MedicationStepOut] = Field(default_factory=list)
     needs_retry: bool = False
     message: str = ""
@@ -1024,4 +1067,36 @@ class MedicationCheckListOut(BaseModel):
     page: int = 1
     page_size: int = 20
     retention_days: int = 30
+    disclaimer: str = ""
+
+
+# ---------- 症状日记 ----------
+
+
+class SymptomEntryIn(BaseModel):
+    record_date: date | None = None
+    cough: int = Field(default=0, ge=0, le=3)
+    dyspnea: int = Field(default=0, ge=0, le=3)
+    sputum: int = Field(default=0, ge=0, le=3)
+    note: str = Field(default="", max_length=1000)
+
+
+class SymptomEntryOut(BaseModel):
+    id: int
+    record_date: date
+    cough: int = 0
+    dyspnea: int = 0
+    sputum: int = 0
+    note: str = ""
+    total: int = 0
+    warning: bool = False
+    warning_text: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class SymptomDiaryOut(BaseModel):
+    items: list[SymptomEntryOut] = Field(default_factory=list)
+    warning: bool = False
+    warning_text: str = ""
     disclaimer: str = ""

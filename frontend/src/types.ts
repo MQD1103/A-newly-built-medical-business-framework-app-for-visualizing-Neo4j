@@ -67,6 +67,9 @@ export interface ServiceProduct {
   owned?: boolean
 }
 
+export type ReminderKind = 'general' | 'medication' | 'checkup'
+export type RepeatRule = 'none' | 'daily' | 'weekly'
+
 export interface Reminder {
   id: number
   course_id: number | null
@@ -84,6 +87,15 @@ export interface Reminder {
   notify_enabled?: boolean
   can_delete?: boolean
   can_edit?: boolean
+  completed?: boolean
+  completed_at?: string | null
+  kind: ReminderKind
+  drug_name: string
+  dosage: string
+  repeat_rule: RepeatRule
+  check_type: string
+  prep_questions: string
+  recurring_parent_id?: number | null
 }
 
 export interface ScheduleSlot {
@@ -190,4 +202,261 @@ export interface FriendActionResult {
   user_id: number
   status: 'pending' | 'accepted'
   auto_accepted: boolean
+}
+
+// ---------- 商城订单 / 我的课程（routers/mall.py）----------
+
+export interface MallMyCourse {
+  course: Course & { expires_at?: string | null }
+  source: string
+  expires_at: string | null
+  total_lessons: number
+  completed_lessons: number
+  progress_percent: number
+}
+
+export type MallOrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'cancelled'
+  | 'refund_pending'
+  | 'refunded'
+  | 'partially_refunded'
+  | string
+
+export interface MallOrderSeat {
+  id: number
+  learner_user_id: number | null
+  learner_name: string
+  learner_phone: string
+  activation_code: string
+  status: string
+  activated_at: string | null
+  refund_amount: number
+  refunded_at: string | null
+}
+
+export interface MallOrder {
+  id: number
+  order_no: string
+  product_type: 'course' | 'service'
+  product_id: number
+  product_name: string
+  product_cover: string
+  product_category: string
+  quantity: number
+  unit_price: number
+  original_amount: number
+  discount_amount: number
+  amount: number
+  status: MallOrderStatus
+  channel: string
+  order_type: string
+  transaction_id: string
+  buyer_id: number
+  buyer_name: string
+  created_at: string
+  expires_at: string | null
+  paid_at: string | null
+  valid_until: string | null
+  cancelled_at: string | null
+  refunded_at: string | null
+  refund_amount: number
+  refund_reason: string
+  upgrade_from_order_id: number | null
+  upgrade_source_order_nos: string[]
+  seats: MallOrderSeat[]
+  can_pay: boolean
+  can_cancel: boolean
+  refundable: boolean
+  refund_hint: string
+}
+
+export interface MallOrderList {
+  items: MallOrder[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface MallRefundCheck {
+  eligible: boolean
+  reason: string
+  refund_amount: number
+  within_window: boolean
+  window_ends_at: string | null
+  progress_percent: number
+  policy: string
+}
+
+export interface MallRefundPolicy {
+  policy: string
+  window_days: number
+  progress_limit: number
+  order_ttl_minutes: number
+  auto_refund: boolean
+}
+
+// ---------- 医院资料（routers/hospital.py）----------
+
+export interface HospitalPartner {
+  id: number
+  code: string
+  name: string
+  department: string
+  status: string
+  mode: string
+  contact: string
+  note: string
+}
+
+export interface HospitalAuthorization {
+  id: number
+  partner_id: number
+  partner_name: string
+  patient_ref_masked: string
+  scopes: string[]
+  status: 'active' | 'expired' | 'revoked' | string
+  authorized_at: string
+  expires_at: string | null
+  revoked_at: string | null
+}
+
+export type HospitalRecordType = 'advice' | 'condition' | 'record'
+
+export interface HospitalRecord {
+  id: number
+  partner_id: number
+  partner_name: string
+  record_type: HospitalRecordType
+  title: string
+  content: string
+  doctor_name: string
+  department: string
+  occurred_at: string | null
+  fetched_at: string
+}
+
+export interface HospitalCaregiver {
+  id: number
+  patient_user_id: number
+  patient_name: string
+  caregiver_user_id: number
+  caregiver_name: string
+  relation: string
+  status: 'active' | 'revoked' | string
+  granted_at: string
+  revoked_at: string | null
+}
+
+export interface HospitalCaregivers {
+  granted: HospitalCaregiver[]
+  received: HospitalCaregiver[]
+}
+
+// ---------- AI 用药动作检测（routers/ai.py）----------
+
+export type MedicationMode = 'oral' | 'inhale'
+
+export interface MedicationStep {
+  name: string
+  done: boolean
+}
+
+export interface MedicationCheck {
+  id: number
+  user_id: number
+  lesson_id: number | null
+  status: string
+  provider: string
+  mode: MedicationMode
+  steps: MedicationStep[]
+  needs_retry: boolean
+  message: string
+  image_size: number
+  image_type: string
+  created_at: string
+  expires_at: string | null
+  disclaimer: string
+}
+
+export interface MedicationCheckList {
+  items: MedicationCheck[]
+  total: number
+  page: number
+  page_size: number
+  retention_days: number
+  disclaimer: string
+}
+
+// ---------- 症状日记（routers/symptoms.py）----------
+
+export interface SymptomEntry {
+  id: number
+  record_date: string
+  cough: number
+  dyspnea: number
+  sputum: number
+  note: string
+  total: number
+  warning: boolean
+  warning_text: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SymptomDiary {
+  items: SymptomEntry[]
+  warning: boolean
+  warning_text: string
+  disclaimer: string
+}
+
+// ---------- 消息通知与手机推送（routers/notifications.py）----------
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  reminder_id: number
+  course_id: number | null
+  course_name: string
+  trigger_key: string
+  title: string
+  body: string
+  external_url: string
+  due_at: string | null
+  created_at: string
+  read_at: string | null
+  read: boolean
+  click_url: string
+}
+
+export interface NotificationList {
+  items: AppNotification[]
+  total: number
+  unread: number
+  page: number
+  page_size: number
+}
+
+export interface PushConfig {
+  enabled: boolean
+  public_key: string
+  subject: string
+  reason: string
+}
+
+export interface PushStatus {
+  enabled: boolean
+  reason: string
+  subscriptions: number
+  last_success_at: string | null
+}
+
+export interface PushTestResult {
+  ok: boolean
+  sent: number
+  failed: number
+  total: number
+  detail: string
 }

@@ -526,6 +526,7 @@ def submit_quiz(
         correct = chosen == q.answer_index
         if correct:
             score += 1
+        lesson = db.get(Lesson, q.lesson_id) if q.lesson_id else None
         details.append(
             QuizDetailOut(
                 question_id=q.id,
@@ -534,6 +535,8 @@ def submit_quiz(
                 answer_index=q.answer_index,
                 correct=correct,
                 explanation=q.explanation or "",
+                lesson_id=q.lesson_id,
+                lesson_title=lesson.title if lesson else "",
             )
         )
         answers_record.append(

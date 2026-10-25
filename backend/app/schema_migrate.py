@@ -238,6 +238,64 @@ def _migrate_mall_tables() -> None:
             )
 
 
+def _migrate_feature_v2() -> None:
+    """用药/检查提醒字段、错题对应课时、用药检测方式。"""
+    tables = set(inspect(engine).get_table_names())
+
+    if "reminders" in tables:
+        _add_columns(
+            "reminders",
+            {
+                "kind": "VARCHAR(20) DEFAULT 'general'",
+                "drug_name": "VARCHAR(120) DEFAULT ''",
+                "dosage": "VARCHAR(120) DEFAULT ''",
+                "repeat_rule": "VARCHAR(20) DEFAULT 'none'",
+                "check_type": "VARCHAR(120) DEFAULT ''",
+                "prep_questions": "TEXT DEFAULT ''",
+                "recurring_parent_id": "INTEGER",
+            },
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE reminders SET kind='general' "
+                     "WHERE kind IS NULL OR kind=''")
+            )
+            conn.execute(
+                text("UPDATE reminders SET repeat_rule='none' "
+                     "WHERE repeat_rule IS NULL OR repeat_rule=''")
+            )
+
+    if "quiz_questions" in tables:
+        _add_columns(
+            "quiz_questions",
+            {"lesson_id": "INTEGER REFERENCES lessons(id)"},
+        )
+
+    if "medication_checks" in tables:
+        _add_columns(
+            "medication_checks",
+            {"mode": "VARCHAR(20) DEFAULT 'oral'"},
+        )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE medication_checks SET mode='oral' "
+                     "WHERE mode IS NULL OR mode=''")
+            )
+
+    if "hospital_reminder_links" in tables and "reminders" in tables:
+        # 清理历史遗留的悬空关联（提醒被删但关联仍在，SQLite 复用 id 时会撞唯一约束）
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "DELETE FROM hospital_reminder_links "
+                    "WHERE NOT EXISTS ("
+                    "  SELECT 1 FROM reminders WHERE reminders.id = "
+                    "  hospital_reminder_links.reminder_id"
+                    ")"
+                )
+            )
+
+
 def ensure_schema() -> None:
     """为已有库补齐新增列。
 
@@ -385,3 +443,4 @@ def ensure_schema() -> None:
                 )
 
     _migrate_mall_tables()
+    _migrate_feature_v2()

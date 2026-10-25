@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
@@ -10,6 +10,7 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import (
     Course,
+    HospitalReminderLink,
     Notification,
     Reminder,
     ReminderCompletion,
@@ -85,6 +86,13 @@ def to_out(r: Reminder, user: User, db: Session) -> ReminderOut:
         completed_at=completion.completed_at if completion else None,
         can_delete=source == "user" and r.creator_id == user.id,
         can_edit=can_edit_reminder(user, r),
+        kind=r.kind or "general",
+        drug_name=r.drug_name or "",
+        dosage=r.dosage or "",
+        repeat_rule=r.repeat_rule or "none",
+        check_type=r.check_type or "",
+        prep_questions=r.prep_questions or "",
+        recurring_parent_id=r.recurring_parent_id,
     )
 
 
@@ -177,6 +185,12 @@ def create_reminder(
         external_url=(body.external_url or "").strip(),
         creator_id=user.id,
         source=source,
+        kind=body.kind,
+        drug_name=(body.drug_name or "").strip(),
+        dosage=(body.dosage or "").strip(),
+        repeat_rule=body.repeat_rule,
+        check_type=(body.check_type or "").strip(),
+        prep_questions=(body.prep_questions or "").strip(),
     )
     db.add(reminder)
     db.commit()
@@ -207,6 +221,18 @@ def update_reminder(
         reminder.due_at = body.due_at
     if body.external_url is not None:
         reminder.external_url = body.external_url.strip()
+    if body.kind is not None:
+        reminder.kind = body.kind
+    if body.drug_name is not None:
+        reminder.drug_name = body.drug_name.strip()
+    if body.dosage is not None:
+        reminder.dosage = body.dosage.strip()
+    if body.repeat_rule is not None:
+        reminder.repeat_rule = body.repeat_rule
+    if body.check_type is not None:
+        reminder.check_type = body.check_type.strip()
+    if body.prep_questions is not None:
+        reminder.prep_questions = body.prep_questions.strip()
     db.commit()
     db.refresh(reminder)
     notification_service.sync_reminder_notifications(db, reminder)
@@ -253,6 +279,51 @@ def set_reminder_notify(
     return to_out(reminder, user, db)
 
 
+def spawn_next_occurrence(db: Session, reminder: Reminder) -> Reminder | None:
+    """重复提醒完成后生成下一周期，保留本次完成记录。
+
+    直接复制一条新提醒，而不是复用原记录，这样：
+    - 本次「已完成」记录不会被冲掉；
+    - 新提醒有独立 id，可正常再触发站内通知。
+    """
+    rule = reminder.repeat_rule or "none"
+    if rule not in ("daily", "weekly"):
+        return None
+    root_id = reminder.recurring_parent_id or reminder.id
+    latest = (
+        db.query(Reminder)
+        .filter(Reminder.recurring_parent_id == root_id)
+        .order_by(Reminder.due_at.desc(), Reminder.id.desc())
+        .first()
+    )
+    base_due = latest.due_at if latest and latest.due_at > reminder.due_at else reminder.due_at
+    next_due = base_due + (timedelta(days=7) if rule == "weekly" else timedelta(days=1))
+    if latest and latest.due_at >= next_due:
+        return None
+
+    clone = Reminder(
+        course_id=reminder.course_id,
+        title=reminder.title,
+        content=reminder.content or "",
+        due_at=next_due,
+        external_url=reminder.external_url or "",
+        creator_id=reminder.creator_id,
+        target_user_id=reminder.target_user_id,
+        source=reminder.source or "user",
+        kind=reminder.kind or "general",
+        drug_name=reminder.drug_name or "",
+        dosage=reminder.dosage or "",
+        repeat_rule=rule,
+        check_type=reminder.check_type or "",
+        prep_questions=reminder.prep_questions or "",
+        recurring_parent_id=root_id,
+    )
+    db.add(clone)
+    db.flush()
+    notification_service.sync_reminder_notifications(db, clone)
+    return clone
+
+
 @router.post("/{reminder_id}/complete", response_model=ReminderOut)
 def complete_reminder(
     reminder_id: int,
@@ -291,6 +362,9 @@ def complete_reminder(
             Notification.reminder_id == reminder_id,
             Notification.read_at.is_(None),
         ).update({"read_at": current}, synchronize_session=False)
+        # 个人重复提醒：完成即排下一周期（用药每日 / 复查每周等）
+        if (reminder.source or "manager") == "user" and reminder.creator_id == user.id:
+            spawn_next_occurrence(db, reminder)
     elif completion is not None:
         db.delete(completion)
 
@@ -321,6 +395,10 @@ def delete_reminder(
     ).delete()
     db.query(Notification).filter(
         Notification.reminder_id == reminder_id
+    ).delete()
+    # 医院嘱托转提醒的关联也一并清理，避免 SQLite 复用 id 后撞唯一约束
+    db.query(HospitalReminderLink).filter(
+        HospitalReminderLink.reminder_id == reminder_id
     ).delete()
     db.delete(reminder)
     db.commit()

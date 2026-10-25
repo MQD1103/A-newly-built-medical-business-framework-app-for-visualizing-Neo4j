@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
@@ -39,6 +39,8 @@ interface QuizResult {
     answer_index: number
     correct: boolean
     explanation: string
+    lesson_id: number | null
+    lesson_title: string
   }[]
 }
 
@@ -68,6 +70,7 @@ export default function Courses() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({})
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
   const [quizSubmitting, setQuizSubmitting] = useState(false)
+  const playerRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -273,6 +276,20 @@ export default function Courses() {
     }
   }
 
+  function lessonNumber(id: number): number {
+    const index = lessonData?.lessons.findIndex((x) => x.id === id) ?? -1
+    return index >= 0 ? index + 1 : 0
+  }
+
+  function jumpToLesson(id: number) {
+    const lesson = lessonData?.lessons.find((x) => x.id === id)
+    if (!lesson || lesson.locked) return
+    setActiveLessonId(id)
+    window.setTimeout(() => {
+      playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
+  }
+
   if (error) {
     return (
       <div className="screen stack-gap">
@@ -392,7 +409,7 @@ export default function Courses() {
                 <p className="muted">该课程暂无课时</p>
               ) : (
                 <>
-                  <div className="lesson-player-wrap">
+                  <div className="lesson-player-wrap" ref={playerRef}>
                     {activeLesson &&
                     !activeLesson.locked &&
                     activeLesson.video_url ? (
@@ -473,6 +490,34 @@ export default function Courses() {
             </section>
           )}
 
+          {lessonData &&
+          lessonData.total_lessons > 0 &&
+          lessonData.completed_lessons >= lessonData.total_lessons ? (
+            <section className="item-card completion-card">
+              <div className="completion-head">
+                <span className="completion-badge">✓</span>
+                <div>
+                  <h2>恭喜完成本课程</h2>
+                  <p className="meta">
+                    已完成全部 {lessonData.total_lessons} 个课时，可以继续测验巩固，
+                    或了解配套的健康服务。
+                  </p>
+                </div>
+              </div>
+              <div className="row-actions">
+                <Link to="/service-shop" className="btn primary small">
+                  了解相关服务
+                </Link>
+                <Link to="/symptom-diary" className="linkish">
+                  记录症状
+                </Link>
+                <Link to="/reminders" className="linkish">
+                  设置复查提醒
+                </Link>
+              </div>
+            </section>
+          ) : null}
+
           {(active?.enrolled || isAdmin) && (
             <section className="item-card quiz-section">
               <div className="lesson-head">
@@ -541,6 +586,23 @@ export default function Courses() {
                               <p className="meta" style={{ margin: 0 }}>
                                 解析：{d.explanation}
                               </p>
+                            ) : null}
+                            {!d.correct && d.lesson_id ? (
+                              <div className="row-actions">
+                                <button
+                                  type="button"
+                                  className="linkish primary"
+                                  disabled={
+                                    !lessonData?.lessons.find(
+                                      (x) => x.id === d.lesson_id && !x.locked,
+                                    )
+                                  }
+                                  onClick={() => jumpToLesson(d.lesson_id as number)}
+                                >
+                                  回看第 {lessonNumber(d.lesson_id)} 课
+                                  {d.lesson_title ? `：${d.lesson_title}` : ''}
+                                </button>
+                              </div>
                             ) : null}
                           </li>
                         ))}

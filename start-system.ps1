@@ -70,6 +70,9 @@ if (-not $npm) {
   exit 1
 }
 
+$Requirements = Join-Path $Backend 'requirements.txt'
+$RequirementsStamp = Join-Path $VenvDir 'requirements.sha256'
+
 # 首次：自动创建后端虚拟环境并安装依赖
 if (-not (Test-Path -LiteralPath $VenvPython)) {
   Write-Step '首次运行：正在创建后端虚拟环境并安装依赖（可能需要几分钟）...'
@@ -88,8 +91,33 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     exit 1
   }
   & $VenvPython -m pip install --upgrade pip -i $PipMirror
-  & $VenvPython -m pip install -r (Join-Path $Backend 'requirements.txt') -i $PipMirror --timeout 60 --retries 5
+  & $VenvPython -m pip install -r $Requirements -i $PipMirror --timeout 60 --retries 5
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host '[错误] 后端依赖安装失败，请检查网络后重试。' -ForegroundColor Red
+    exit 1
+  }
+  (Get-FileHash -Algorithm SHA256 -LiteralPath $Requirements).Hash |
+    Set-Content -LiteralPath $RequirementsStamp -Encoding ASCII
   Write-Host '[成功] 后端依赖已安装。' -ForegroundColor Green
+}
+
+# 已有的虚拟环境：requirements.txt 变更后自动补装（例如新增的手机通知依赖）
+if (Test-Path -LiteralPath $VenvPython) {
+  $requirementsHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Requirements).Hash
+  $installedHash = ''
+  if (Test-Path -LiteralPath $RequirementsStamp) {
+    $installedHash = (Get-Content -LiteralPath $RequirementsStamp -Raw).Trim()
+  }
+  if ($installedHash -ne $requirementsHash) {
+    Write-Step '检测到后端依赖有更新，正在安装（可能需要几分钟）...'
+    & $VenvPython -m pip install -r $Requirements -i $PipMirror --timeout 60 --retries 5
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host '[错误] 后端依赖安装失败，请检查网络；也可手动执行 backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt' -ForegroundColor Red
+      exit 1
+    }
+    Set-Content -LiteralPath $RequirementsStamp -Value $requirementsHash -Encoding ASCII
+    Write-Host '[成功] 后端依赖已更新。' -ForegroundColor Green
+  }
 }
 
 # 首次：自动安装前端依赖
