@@ -503,6 +503,9 @@ export default function Courses() {
             </div>
             <p className="course-search-hint">
               支持搜索课程名称、知识点关键词
+              <Link to="/family" className="course-search-tool">
+                👨‍👩‍👧 家属照护专区 ›
+              </Link>
               <Link to="/toolkit" className="course-search-tool">
                 学习工具箱 ›
               </Link>

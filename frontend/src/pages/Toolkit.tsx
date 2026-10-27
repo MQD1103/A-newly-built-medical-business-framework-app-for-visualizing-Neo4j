@@ -524,6 +524,9 @@ export default function Toolkit() {
           <p className="muted tk-intro">
             照护不是「多做一点」，而是「做对几件事」：会测血氧、会叩背排痰、能识别危险信号。
           </p>
+          <Link to="/family" className="toolkit-jump">
+            👨‍👩‍👧 进入家属照护专区：观察病情 · 协助用药 · 排痰 · 送医判断 · 照护者自评 ›
+          </Link>
           <div className="tk-family">
             {FAMILY_GUIDE.map((g) => (
               <div key={g.title} className="tk-family-card">

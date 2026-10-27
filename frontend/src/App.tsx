@@ -6,6 +6,7 @@ import AdminUser from './pages/AdminUser'
 import AiCheck from './pages/AiCheck'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
+import Family from './pages/Family'
 import Friends from './pages/Friends'
 import Home from './pages/Home'
 import Hospital from './pages/Hospital'
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="supervision" element={<Supervision />} />
         <Route path="materials" element={<Materials />} />
         <Route path="toolkit" element={<Toolkit />} />
+        <Route path="family" element={<Family />} />
         <Route path="scores" element={<Scores />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="manage" element={<Manage />} />

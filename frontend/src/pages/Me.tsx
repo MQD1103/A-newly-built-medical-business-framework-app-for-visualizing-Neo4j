@@ -88,6 +88,10 @@ export default function Me() {
           <span>学习工具箱 · 量表 / 记录表 / 手册</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/family" className="menu-row">
+          <span>👨‍👩‍👧 家属照护专区</span>
+          <span className="chev">›</span>
+        </Link>
         <Link to="/notifications" className="menu-row">
           <span>消息通知</span>
           <span className="chev">›</span>

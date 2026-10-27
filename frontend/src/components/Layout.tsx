@@ -27,6 +27,7 @@ export default function Layout() {
     pathname.startsWith('/supervision') ||
     pathname.startsWith('/materials') ||
     pathname.startsWith('/scores') ||
+    pathname.startsWith('/family') ||
     pathname.startsWith('/orders')
 
   const servicesActive =
