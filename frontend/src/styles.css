@@ -4505,3 +4505,138 @@ textarea:focus {
   font-size: 0.72rem;
   color: var(--muted);
 }
+/* ============================================================
+ * 首页星图特效 2.0（纯 CSS 追加，不影响任何交互逻辑）
+ * 1) 星海漂移背景  2) 节点悬浮呼吸  3) 连线辉光明暗律动
+ * 4) 主键雷达脉冲环  5) 连线速率分层  6) 降低动效偏好兼容
+ * ============================================================ */
+
+/* ---- 1) 星海漂移：两层细小星点缓慢流动，叠加在原有渐变之上 ---- */
+.neo-stage {
+  background-image:
+    radial-gradient(circle, rgba(59, 134, 224, 0.2) 1px, transparent 1.7px),
+    radial-gradient(circle, rgba(59, 134, 224, 0.13) 1px, transparent 1.6px),
+    radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.7), transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(91, 163, 245, 0.12), transparent 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(232, 243, 255, 0.35));
+  background-size:
+    96px 96px,
+    144px 144px,
+    auto,
+    auto,
+    auto;
+  animation: neo-star-drift 64s linear infinite;
+}
+
+@keyframes neo-star-drift {
+  from {
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+  }
+  to {
+    background-position:
+      96px 48px,
+      -144px 72px,
+      0 0,
+      0 0,
+      0 0;
+  }
+}
+
+/* 拖拽 / 搜寻时暂停星海，避免视觉干扰 */
+.neo-stage.panning,
+.neo-stage.dragging-node,
+.neo-stage.seeking {
+  animation-play-state: paused;
+}
+
+/* ---- 2) 节点悬浮呼吸：子键缓慢上下漂浮，主键轻微浮动 ---- */
+/* 使用独立的 translate 属性，不干扰 transform 定位与悬浮缩放 */
+@keyframes neo-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -5px;
+  }
+}
+
+.neo-node.is-child {
+  animation: neo-float 5.6s ease-in-out infinite;
+  animation-delay: calc(var(--ripple-delay, 0s) * -1.4);
+}
+
+.neo-node.is-child.dragging,
+.neo-stage.seeking .neo-node.is-child,
+.neo-stage.dragging-node .neo-node {
+  animation-play-state: paused;
+}
+
+.neo-node.is-primary {
+  animation:
+    neo-primary-breathe 3.2s ease-in-out infinite,
+    neo-float 7s ease-in-out infinite;
+}
+
+/* ---- 3) 连线辉光明暗律动：流光呼吸感 ---- */
+.neo-edges .neo-edge-flow {
+  animation:
+    edge-flow 1.8s linear infinite,
+    neo-edge-glow 3.4s ease-in-out infinite;
+}
+
+@keyframes neo-edge-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* ---- 4) 主键雷达脉冲环：一圈圈向外扩散的信号 ---- */
+.neo-node.is-primary .node-ripple {
+  border-color: rgba(1, 139, 255, 0.5);
+  box-shadow: 0 0 12px rgba(1, 139, 255, 0.3);
+  animation: primary-radar 2.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+
+@keyframes primary-radar {
+  0% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+/* ---- 5) 连线速率分层：激活连线流光加速 ---- */
+.edge-active .neo-edge-flow {
+  animation-duration: 0.9s, 1.4s;
+}
+
+/* ---- 6) 降低动效偏好：系统开启"减少动态效果"时全部静止 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .neo-stage {
+    animation: none;
+  }
+
+  .neo-node,
+  .neo-node.is-child,
+  .neo-node.is-primary,
+  .neo-node.is-primary .node-ripple,
+  .neo-edges .neo-edge-flow {
+    animation: none;
+  }
+}
