@@ -6621,8 +6621,8 @@ textarea:focus {
     radial-gradient(circle at 10% -4%, rgba(91, 163, 245, 0.26), transparent 42%),
     /* 右上柔光 */
     radial-gradient(circle at 104% 26%, rgba(122, 190, 255, 0.2), transparent 40%),
-    /* 医疗十字 + 圆点纹 */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='104' viewBox='0 0 104 104'%3E%3Cpath d='M47 20h10v10h10v10H57v10H47V50H37V40h10z' fill='%233b86e0' fill-opacity='0.09'/%3E%3Ccircle cx='86' cy='86' r='2.6' fill='%233b86e0' fill-opacity='0.1'/%3E%3Ccircle cx='14' cy='78' r='2' fill='%233b86e0' fill-opacity='0.08'/%3E%3C/svg%3E"),
+    /* 同心呼吸圆环 + 圆点 */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='132' viewBox='0 0 132 132'%3E%3Ccircle cx='66' cy='66' r='24' fill='none' stroke='%233b86e0' stroke-opacity='0.1' stroke-width='1.4'/%3E%3Ccircle cx='66' cy='66' r='38' fill='none' stroke='%233b86e0' stroke-opacity='0.07' stroke-width='1.2'/%3E%3Ccircle cx='66' cy='66' r='3' fill='%233b86e0' fill-opacity='0.1'/%3E%3C/svg%3E"),
     /* 点阵 */
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='2.5' cy='2.5' r='1.5' fill='%233b86e0' fill-opacity='0.13'/%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat;
@@ -6630,7 +6630,7 @@ textarea:focus {
     100% 120px,
     auto,
     auto,
-    104px 104px,
+    132px 132px,
     22px 22px;
   background-position:
     bottom center,
