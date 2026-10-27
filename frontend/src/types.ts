@@ -38,6 +38,16 @@ export interface Course {
   category?: string
   /** 适用人群，如「新确诊患者」 */
   audience?: string
+  /** 学习权有效期（天）：730 = 2 年；0 = 长期有效 */
+  valid_days?: number
+  /** 学习权到期时间（ISO）；为空且 enrolled=true 表示长期有效 */
+  expires_at?: string | null
+  /** 剩余天数（后端算好，向上取整）；为空表示长期有效或未开通 */
+  days_left?: number | null
+  /** 剩余 ≤ 30 天，提示「即将到期」 */
+  expiring_soon?: boolean
+  /** 曾经开通过但已过期，可续期 */
+  expired?: boolean
 }
 
 export interface Lesson {

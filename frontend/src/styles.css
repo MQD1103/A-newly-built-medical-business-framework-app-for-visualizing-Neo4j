@@ -1656,6 +1656,39 @@ textarea:focus {
   gap: 8px;
 }
 
+/* ---- 学习权有效期（两年有效期提示 / 续期入口） ---- */
+.course-card-warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.course-validity {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--blue-wash);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.86rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.course-validity.is-warn {
+  background: #fff7e8;
+  border-color: #f3d19b;
+  color: #8a5a12;
+}
+
+.course-validity.is-expired {
+  background: #fdeeee;
+  border-color: #f0c2c2;
+  color: #a33a3a;
+}
+
 .ok-tip {
   margin: 10px 0 0;
   color: #1f7a4c;

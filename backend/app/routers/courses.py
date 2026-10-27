@@ -5,6 +5,7 @@
 """
 
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -76,8 +77,14 @@ def to_out(
     c: Course,
     owned: set[int] | None = None,
     expires_at: object | None = None,
+    expired: bool = False,
 ) -> CourseOut:
     owned_flag = True if owned is None else c.id in owned
+    left = (
+        mall.days_left(expires_at)
+        if owned_flag and isinstance(expires_at, datetime)
+        else None
+    )
     return CourseOut(
         id=c.id,
         name=c.name,
@@ -102,6 +109,11 @@ def to_out(
         audience=c.audience or "",
         lesson_count=len(mall.course_lessons(db, c)),
         expires_at=expires_at,
+        days_left=left,
+        expiring_soon=bool(
+            left is not None and 0 < left <= mall.EXPIRING_SOON_DAYS
+        ),
+        expired=bool(expired and not owned_flag),
     )
 
 
@@ -109,12 +121,21 @@ def with_access(
     db: Session, user: User, courses: list[Course]
 ) -> list[CourseOut]:
     owned = mall.accessible_course_ids(db, user)
+    expiry_map = mall.enrollment_expiry_map(db, user.id)
     result: list[CourseOut] = []
     for c in courses:
-        expiry = None
-        if c.id in owned:
-            _, expiry, _ = mall.course_access_info(db, user, c)
-        result.append(to_out(db, c, owned, expiry))
+        info = expiry_map.get(c.id) or {}
+        is_owned = c.id in owned
+        expiry = info.get("expires_at") if is_owned else None
+        result.append(
+            to_out(
+                db,
+                c,
+                owned,
+                expiry,
+                expired=bool(info.get("expired")),
+            )
+        )
     return result
 
 
@@ -621,24 +642,8 @@ def enroll(
     return {"ok": True}
 
 
-@router.post("/{course_id}/purchase", response_model=CoursePurchaseOut)
-def purchase_course(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """兼容旧前端的「确认即支付」：内部走完整订单 → 模拟支付。"""
-    try:
-        order = mall.create_course_order(
-            db, user, course_id, quantity=1, channel="mock"
-        )
-        if order.status == "pending":
-            order = mall.pay_course_order(
-                db, order, channel="mock", transaction_id="LEGACY"
-            )
-    except mall.MallError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
+def purchase_out(db: Session, user: User, order: CoursePurchase) -> CoursePurchaseOut:
+    """订单 → 出参（购课与续期共用）。"""
     course = db.get(Course, order.course_id)
     owned = enrolled_ids(db, user)
     return CoursePurchaseOut(
@@ -671,6 +676,55 @@ def purchase_course(
         refunded_at=order.refunded_at,
         refund_reason=order.refund_reason or "",
     )
+
+
+@router.post("/{course_id}/purchase", response_model=CoursePurchaseOut)
+def purchase_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """兼容旧前端的「确认即支付」：内部走完整订单 → 模拟支付。"""
+    try:
+        order = mall.create_course_order(
+            db, user, course_id, quantity=1, channel="mock"
+        )
+        if order.status == "pending":
+            order = mall.pay_course_order(
+                db, order, channel="mock", transaction_id="LEGACY"
+            )
+    except mall.MallError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    return purchase_out(db, user, order)
+
+
+@router.post("/{course_id}/renew", response_model=CoursePurchaseOut)
+def renew_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """续期：在剩余有效期上叠加一个售卖周期（默认 730 天 = 2 年）。
+
+    仅在「已开通且按有效期售卖（source=purchase）」时可用；
+    长期有效（管理员开通/演示）与整包带入的访问权不支持续期。
+    """
+    try:
+        order = mall.create_course_order(
+            db, user, course_id, quantity=1, channel="mock", renew=True
+        )
+        if order.status == "pending":
+            order = mall.pay_course_order(
+                db, order, channel="mock", transaction_id="RENEW"
+            )
+    except mall.MallError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+    course = db.get(Course, course_id)
+    if course is not None:
+        db.refresh(course)
+    return purchase_out(db, user, order)
+
 
 
 @router.get("/purchases/mine", response_model=list[CoursePurchaseOut])

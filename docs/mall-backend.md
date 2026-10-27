@@ -56,6 +56,22 @@ backend\.venv\Scripts\python.exe backend\scripts\generate_demo_videos.py
 - 试看规则：`is_trial=true` 或整包/单课已拥有时，接口才返回 `video_url`；
   未购买的付费课时返回 `locked=true` 且 `video_url=""`。
 
+### 2.1 两年有效期与续期
+
+课程按「买断 N 年」售卖，默认 `courses.valid_days = 730`（2 年）；`0` 表示长期有效。
+
+| 场景 | 行为 |
+|---|---|
+| 首次购买 | `enrollments.expires_at = 支付时间 + valid_days`，订单 `valid_until` 同值 |
+| 剩余 ≤ 30 天 | 课程接口返回 `expiring_soon=true` + `days_left`，前端提示「还剩 N 天，记得续期」 |
+| 已过期 | 课程列表返回 `expired=true`、`enrolled=false`，前端显示「已过期」，可续期或重新购买 |
+| 续期（有效期内外均可） | `POST /api/courses/{id}/renew`，订单 `order_type=renew`，新到期时间 = **原到期时间 + valid_days**（剩余天数不吞） |
+| 长期有效 / 整包带入 | 不支持续期，返回 409「当前学习权不支持续期」 |
+
+- 续期只允许 `source=purchase` 的直接学习权：整包带入的访问权随整包走，管理员开通的长期有效不需要续期。
+- 到期后重新购买与续期等价（`has_course_access=false` 时直接走购买），差别只是新到期时间从当天起算。
+- 课程接口字段：`valid_days`、`expires_at`、`days_left`、`expiring_soon`、`expired`，前端不需要自己算日期。
+
 ## 3. 订单状态机
 
 ```

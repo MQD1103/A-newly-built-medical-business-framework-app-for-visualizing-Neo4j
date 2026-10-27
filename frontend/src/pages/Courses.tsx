@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import type { Course, CourseLessons, Lesson, ScheduleSlot } from '../types'
-import { formatPrice, mediaUrl, priceText, weekdayLabel } from '../utils'
+import { formatDate, formatPrice, mediaUrl, priceText, weekdayLabel } from '../utils'
 
 /** 课程价格兜底值，与后端 courses.py 的默认售价保持一致 */
 const PRICE_FALLBACK = 2.99
@@ -438,6 +438,35 @@ export default function Courses() {
     }
   }
 
+  async function onRenew() {
+    if (!active) return
+    const label = active.days_left ? `当前还剩 ${active.days_left} 天` : '已过期'
+    const years = active.valid_days && active.valid_days >= 365
+      ? `${Math.round(active.valid_days / 365)} 年`
+      : `${active.valid_days || 0} 天`
+    const ok = confirm(
+      `续期「${active.name}」？\n${label}，续期后在原到期时间上再叠加 ${years}。\n` +
+        `（当前为模拟支付，确认即续期）`,
+    )
+    if (!ok) return
+    setBuying(true)
+    setPayTip('')
+    try {
+      await api(`/api/courses/${active.id}/renew`, { method: 'POST' })
+      const list = await load()
+      const updated = list.find((x) => x.id === active.id)
+      setPayTip(
+        updated?.expires_at
+          ? `续期成功，学习权已延长至 ${formatDate(updated.expires_at)}`
+          : '续期成功',
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '续期失败')
+    } finally {
+      setBuying(false)
+    }
+  }
+
   async function markLessonDone(lesson: Lesson) {
     if (marking || lesson.locked || !lessonData) return
     setMarking(true)
@@ -645,8 +674,21 @@ export default function Courses() {
                           {c.audience ? ` · ${c.audience}` : ''}
                         </p>
                         <p className="meta">
-                          {isAdmin ? '免费开放' : c.enrolled ? '已开通' : '未开通'}
+                          {isAdmin
+                            ? '免费开放'
+                            : c.enrolled
+                              ? c.expires_at
+                                ? `已开通 · 有效期至 ${formatDate(c.expires_at)}`
+                                : '已开通 · 长期有效'
+                              : c.expired
+                                ? '已过期'
+                                : '未开通'}
                         </p>
+                        {c.enrolled && c.expiring_soon ? (
+                          <p className="meta course-card-warn">
+                            还剩 {c.days_left} 天，记得续期
+                          </p>
+                        ) : null}
                         {lessonHint.get(c.id)?.length ? (
                           <p className="meta course-card-hit">
                             命中知识点：{lessonHint.get(c.id)?.[0]}
@@ -680,7 +722,13 @@ export default function Courses() {
               <p className="meta">
                 {active.semester}
                 {active.teacher_name ? ` · ${active.teacher_name}` : ''}
-                {isAdmin ? ' · 免费开放' : active.enrolled ? ' · 已开通' : ' · 未开通'}
+                {isAdmin
+                  ? ' · 免费开放'
+                  : active.enrolled
+                    ? ' · 已开通'
+                    : active.expired
+                      ? ' · 已过期'
+                      : ' · 未开通'}
               </p>
               {active.description ? (
                 <p style={{ margin: '10px 0 0' }}>{active.description}</p>
@@ -690,6 +738,45 @@ export default function Courses() {
                 </p>
               )}
 
+              {!isAdmin && active.valid_days ? (
+                <div
+                  className={`course-validity${
+                    active.expired
+                      ? ' is-expired'
+                      : active.expiring_soon
+                        ? ' is-warn'
+                        : ''
+                  }`}
+                >
+                  {active.expired ? (
+                    <span>学习权已过期，续期后可继续学习</span>
+                  ) : active.enrolled && active.expires_at ? (
+                    <span>
+                      学习权有效期至 {formatDate(active.expires_at)}
+                      {active.days_left !== null && active.days_left !== undefined
+                        ? `（还剩 ${active.days_left} 天）`
+                        : ''}
+                    </span>
+                  ) : (
+                    <span>
+                      购买后学习权 {active.valid_days >= 365
+                        ? `${Math.round(active.valid_days / 365)} 年`
+                        : `${active.valid_days} 天`}
+                      内有效，到期可续期
+                    </span>
+                  )}
+                  {(active.expired || (active.enrolled && active.expiring_soon)) && (
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={buying}
+                      onClick={() => void onRenew()}
+                    >
+                      {buying ? '处理中…' : '续期'}
+                    </button>
+                  )}
+                </div>
+              ) : null}
               {active.enrolled || isAdmin ? (
                 <>
                   <div className="course-quick-links">

@@ -127,6 +127,12 @@ class CourseOut(BaseModel):
     lesson_count: int = 0
     # 当前用户的学习权到期时间；为空且 enrolled=True 表示长期有效
     expires_at: datetime | None = None
+    # 学习权剩余天数（向上取整）；为空表示长期有效或未开通
+    days_left: int | None = None
+    # 剩余天数 ≤ 30 天，前端据此提示续期
+    expiring_soon: bool = False
+    # 曾经开通过但已过期：前端显示「已过期·可续期」而不是「未开通」
+    expired: bool = False
 
 
 class EnrollmentCreate(BaseModel):

@@ -613,6 +613,12 @@ BUNDLE_COURSE_NAME = "COPD 系统课（整包）"
 DEMO_VIDEO_DIR = Path(__file__).resolve().parent.parent / "uploads" / "courses" / "demo"
 DEMO_VIDEO_SECONDS = 10
 
+# 按课时内容生成的讲解片（backend/scripts/generate_lesson_videos.py），
+# 优先级高于 demo 目录：有就用讲解片，没有再退回 10 秒演示片。
+LESSON_VIDEO_DIR = (
+    Path(__file__).resolve().parent.parent / "uploads" / "courses" / "lessons"
+)
+
 
 LEGACY_PAID_TITLES = {"课程导览与学习目标", "核心知识点讲解", "日常执行清单与自测"}
 
@@ -893,21 +899,27 @@ def ensure_mall_catalog(db: Session) -> None:
 def attach_demo_lesson_videos(db: Session) -> None:
     """本地演示视频存在时，自动挂到还没有视频地址的课时上。
 
+    优先级：``uploads/courses/lessons/``（按课时内容生成的讲解片）
+    → ``uploads/courses/demo/``（早期 10 秒演示片）。
     只补空值，不覆盖管理员填写的真实视频；文件缺失时保持原样。
     """
-    if not DEMO_VIDEO_DIR.is_dir():
-        return
     changed = False
     for lesson in db.query(Lesson).all():
         if (lesson.video_url or "").strip():
             continue
-        candidate = DEMO_VIDEO_DIR / f"lesson-{lesson.id}.mp4"
-        if not candidate.is_file():
-            continue
-        lesson.video_url = f"/uploads/courses/demo/{candidate.name}"
-        # 演示片只有几秒，让页面显示的时长与实际一致
-        lesson.duration_seconds = DEMO_VIDEO_SECONDS
-        changed = True
+        for directory, seconds in (
+            (LESSON_VIDEO_DIR, 0),
+            (DEMO_VIDEO_DIR, DEMO_VIDEO_SECONDS),
+        ):
+            candidate = directory / f"lesson-{lesson.id}.mp4"
+            if not candidate.is_file():
+                continue
+            prefix = directory.name
+            lesson.video_url = f"/uploads/courses/{prefix}/{candidate.name}"
+            # 演示片只有几秒/十几秒，让页面显示的时长与实际一致
+            lesson.duration_seconds = seconds or lesson.duration_seconds or 0
+            changed = True
+            break
     if changed:
         db.commit()
 
