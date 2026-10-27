@@ -34,6 +34,10 @@ export interface Course {
   path_label?: string
   tagline?: string
   lesson_count?: number
+  /** 用途分类（商城目录侧栏），如「入门与自测」 */
+  category?: string
+  /** 适用人群，如「新确诊患者」 */
+  audience?: string
 }
 
 export interface Lesson {

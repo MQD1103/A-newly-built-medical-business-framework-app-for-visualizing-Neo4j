@@ -98,6 +98,8 @@ def to_out(
         sort_order=int(c.sort_order or 0),
         valid_days=int(c.valid_days or 0),
         trial_lesson_count=int(c.trial_lesson_count or 0),
+        category=c.category or "",
+        audience=c.audience or "",
         lesson_count=len(mall.course_lessons(db, c)),
         expires_at=expires_at,
     )
@@ -159,6 +161,8 @@ def create_course(
         sort_order=int(body.sort_order or 0),
         valid_days=int(body.valid_days or 0),
         trial_lesson_count=int(body.trial_lesson_count or 0),
+        category=(body.category or "").strip(),
+        audience=(body.audience or "").strip(),
     )
     db.add(course)
     db.commit()
@@ -183,7 +187,7 @@ def update_course(
     for field, value in data.items():
         if field == "cover_url" and value is not None:
             value = value.strip()
-        if field in ("path_label", "tagline") and value is not None:
+        if field in ("path_label", "tagline", "category", "audience") and value is not None:
             value = value.strip()
         setattr(course, field, value)
     db.commit()

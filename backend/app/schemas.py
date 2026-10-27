@@ -76,6 +76,8 @@ class CourseCreate(BaseModel):
     sort_order: int = 0
     valid_days: int = Field(default=730, ge=0)
     trial_lesson_count: int = Field(default=1, ge=0)
+    category: str = Field(default="", max_length=40)
+    audience: str = Field(default="", max_length=40)
 
 
 class CourseUpdate(BaseModel):
@@ -95,6 +97,8 @@ class CourseUpdate(BaseModel):
     sort_order: int | None = None
     valid_days: int | None = Field(default=None, ge=0)
     trial_lesson_count: int | None = Field(default=None, ge=0)
+    category: str | None = Field(default=None, max_length=40)
+    audience: str | None = Field(default=None, max_length=40)
 
 
 class CourseOut(BaseModel):
@@ -118,6 +122,8 @@ class CourseOut(BaseModel):
     sort_order: int = 0
     valid_days: int = 730
     trial_lesson_count: int = 1
+    category: str = ""
+    audience: str = ""
     lesson_count: int = 0
     # 当前用户的学习权到期时间；为空且 enrolled=True 表示长期有效
     expires_at: datetime | None = None

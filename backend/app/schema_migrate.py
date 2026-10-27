@@ -43,6 +43,8 @@ def _migrate_mall_tables() -> None:
                 "sort_order": "INTEGER DEFAULT 0",
                 "valid_days": "INTEGER DEFAULT 730",
                 "trial_lesson_count": "INTEGER DEFAULT 1",
+                "category": "VARCHAR(40) DEFAULT ''",
+                "audience": "VARCHAR(40) DEFAULT ''",
             },
         )
         with engine.begin() as conn:

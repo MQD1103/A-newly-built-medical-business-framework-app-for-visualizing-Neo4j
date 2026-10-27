@@ -85,6 +85,10 @@ export default function Courses() {
   const [keyword, setKeyword] = useState(() => searchParams.get('kw') || '')
   const [lessonIndex, setLessonIndex] = useState<Record<number, LessonIndexItem[]>>({})
 
+  // 目录侧栏：按用途分类 + 适用人群筛选
+  const [category, setCategory] = useState('all')
+  const [audience, setAudience] = useState('all')
+
 
   // 板块测验状态
   const [quizOpen, setQuizOpen] = useState(false)
@@ -285,10 +289,46 @@ export default function Courses() {
     return hits
   }, [keyword, courses, lessonIndex])
 
-  const visibleCourses = useMemo(
-    () => (searchHits ? searchHits.map((h) => h.course) : courses),
-    [searchHits, courses],
-  )
+  /** 用途分类目录（固定顺序 + 实时计数） */
+  const categoryList = useMemo(() => {
+    const order = [
+      '入门与自测',
+      '用药与氧疗',
+      '康复与运动',
+      '营养与饮食',
+      '预防与防护',
+      '长期管理与照护',
+      '系统整包',
+    ]
+    const counter = new Map<string, number>()
+    for (const c of courses) {
+      const key = (c.category || '').trim() || '其他'
+      counter.set(key, (counter.get(key) || 0) + 1)
+    }
+    return [...counter.entries()].sort((a, b) => {
+      const ia = order.indexOf(a[0])
+      const ib = order.indexOf(b[0])
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a[0].localeCompare(b[0], 'zh')
+    })
+  }, [courses])
+
+  const audienceOptions = [
+    '全部人群',
+    '新确诊患者',
+    '长期管理患者',
+    '家属照护者',
+    '中重度进阶',
+  ]
+
+  const visibleCourses = useMemo(() => {
+    const base = searchHits ? searchHits.map((h) => h.course) : courses
+    return base.filter((c) => {
+      const cat = (c.category || '').trim() || '其他'
+      const okCat = category === 'all' || cat === category
+      const okAud = audience === 'all' || (c.audience || '') === audience
+      return okCat && okAud
+    })
+  }, [searchHits, courses, category, audience])
 
   const lessonHint = useMemo(() => {
     const map = new Map<number, string[]>()
@@ -310,6 +350,13 @@ export default function Courses() {
     }
     setActiveId(searchHits[0].course.id)
   }, [searchHits, activeId])
+
+  // 侧栏筛选后当前课程不在列表里时，自动选中第一门
+  useEffect(() => {
+    if (!visibleCourses.length) return
+    if (activeId != null && visibleCourses.some((c) => c.id === activeId)) return
+    setActiveId(visibleCourses[0].id)
+  }, [visibleCourses, activeId])
 
   function clearSearch() {
     setKeyword('')
@@ -512,44 +559,106 @@ export default function Courses() {
             </p>
           </div>
 
-          {visibleCourses.length === 0 ? (
-            <div className="course-search-empty">
-              <p>没有找到与「{keyword.trim()}」相关的课程</p>
-              <button type="button" className="btn small" onClick={clearSearch}>
-                清空搜索
+          <div className="course-browse">
+            <aside className="course-rail" aria-label="课程目录">
+              <button
+                type="button"
+                className={`rail-item${category === 'all' ? ' active' : ''}`}
+                onClick={() => setCategory('all')}
+              >
+                <span className="rail-name">全部</span>
+                <span className="rail-count">{courses.length}</span>
               </button>
-            </div>
-          ) : (
-            <div className="course-card-grid">
-              {visibleCourses.map((c) => (
+              {categoryList.map(([name, count]) => (
                 <button
-                  key={c.id}
+                  key={name}
                   type="button"
-                  className={`course-card${activeId === c.id ? ' active' : ''}`}
-                  onClick={() => selectCourse(c.id)}
+                  className={`rail-item${category === name ? ' active' : ''}`}
+                  title={name}
+                  onClick={() => setCategory(name)}
                 >
-                  <div className="course-card-cover">
-                    <Cover src={c.cover_url} alt={c.name} />
-                    <span className="course-card-price">
-                      {priceText(c.price, isAdmin, PRICE_FALLBACK)}
-                    </span>
-                  </div>
-                  <div className="course-card-body">
-                    <strong>{c.name}</strong>
-                    <p className="meta">
-                      {c.semester}
-                      {isAdmin ? ' · 免费开放' : c.enrolled ? ' · 已开通' : ''}
-                    </p>
-                    {lessonHint.get(c.id)?.length ? (
-                      <p className="meta course-card-hit">
-                        命中知识点：{lessonHint.get(c.id)?.[0]}
-                      </p>
-                    ) : null}
-                  </div>
+                  <span className="rail-name">{name}</span>
+                  <span className="rail-count">{count}</span>
                 </button>
               ))}
+            </aside>
+
+            <div className="course-main">
+              <div className="course-audience-row" role="group" aria-label="按适用人群筛选">
+                <button
+                  type="button"
+                  className={`aud-chip${audience === 'all' ? ' active' : ''}`}
+                  onClick={() => setAudience('all')}
+                >
+                  全部
+                </button>
+                {audienceOptions.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={`aud-chip${audience === name ? ' active' : ''}`}
+                    onClick={() => setAudience(audience === name ? 'all' : name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
+              {visibleCourses.length === 0 ? (
+                <div className="course-search-empty">
+                  <p>
+                    {keyword.trim()
+                      ? `没有找到与「${keyword.trim()}」相关的课程`
+                      : '该分类下暂无课程'}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn small"
+                    onClick={() => {
+                      if (keyword.trim()) clearSearch()
+                      setCategory('all')
+                      setAudience('all')
+                    }}
+                  >
+                    查看全部课程
+                  </button>
+                </div>
+              ) : (
+                <div className="course-card-grid">
+                  {visibleCourses.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`course-card${activeId === c.id ? ' active' : ''}`}
+                      onClick={() => selectCourse(c.id)}
+                    >
+                      <div className="course-card-cover">
+                        <Cover src={c.cover_url} alt={c.name} />
+                        <span className="course-card-price">
+                          {priceText(c.price, isAdmin, PRICE_FALLBACK)}
+                        </span>
+                      </div>
+                      <div className="course-card-body">
+                        <strong>{c.name}</strong>
+                        <p className="meta">
+                          {c.category || c.semester}
+                          {c.audience ? ` · ${c.audience}` : ''}
+                        </p>
+                        <p className="meta">
+                          {isAdmin ? '免费开放' : c.enrolled ? '已开通' : '未开通'}
+                        </p>
+                        {lessonHint.get(c.id)?.length ? (
+                          <p className="meta course-card-hit">
+                            命中知识点：{lessonHint.get(c.id)?.[0]}
+                          </p>
+                        ) : null}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {activeVisible && active && (
             <section className="item-card course-detail">
@@ -560,6 +669,14 @@ export default function Courses() {
               <p className={`course-price-lg${isAdmin ? ' is-free' : ''}`}>
                 {priceText(active.price, isAdmin, PRICE_FALLBACK)}
               </p>
+              <div className="course-detail-tags">
+                {active.category ? (
+                  <span className="detail-tag">{active.category}</span>
+                ) : null}
+                {active.audience ? (
+                  <span className="detail-tag soft">适合 {active.audience}</span>
+                ) : null}
+              </div>
               <p className="meta">
                 {active.semester}
                 {active.teacher_name ? ` · ${active.teacher_name}` : ''}

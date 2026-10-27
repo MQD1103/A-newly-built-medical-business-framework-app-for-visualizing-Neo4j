@@ -64,6 +64,10 @@ class Course(Base):
     valid_days: Mapped[int] = mapped_column(Integer, default=730)
     # 每个付费课程开放试看的节数（从第 1 节起）
     trial_lesson_count: Mapped[int] = mapped_column(Integer, default=1)
+    # 用途分类，如「入门与自测」「用药与氧疗」（供商城目录侧栏筛选）
+    category: Mapped[str] = mapped_column(String(40), default="", index=True)
+    # 适用人群，如「新确诊患者」「家属照护者」（表示该课对哪类人群更合适）
+    audience: Mapped[str] = mapped_column(String(40), default="", index=True)
 
     teacher: Mapped[User | None] = relationship(back_populates="taught_courses")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="course")
