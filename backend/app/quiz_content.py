@@ -766,3 +766,12 @@ QUIZ_LESSON_HINTS: dict[str, list[int]] = {
     "COPD 终末期安宁照护（进阶）": [0, 1, 2, 3, 4],
     "COPD 无创呼吸机居家使用（进阶）": [0, 1, 2, 3, 4],
 }
+
+# ---------- 第三轮扩充课程（生活场景 / 专项技能 / 长期管理）----------
+from .quiz_content_ext import (  # noqa: E402
+    QUIZ_LESSON_HINTS as _QUIZ_HINTS_EXT,
+    QUIZ_QUESTIONS as _QUIZ_QUESTIONS_EXT,
+)
+
+QUIZ_QUESTIONS.update(_QUIZ_QUESTIONS_EXT)
+QUIZ_LESSON_HINTS.update(_QUIZ_HINTS_EXT)

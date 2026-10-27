@@ -12,6 +12,7 @@
 LessonRow = tuple  # (title, duration_seconds, summary, is_trial)
 
 from .course_content_ext import APPEND_LESSONS, EXT_LESSONS  # noqa: E402  (内容扩充模块)
+from .course_content_ext2 import EXT_LESSONS as EXT_LESSONS2  # noqa: E402  (第三轮扩充)
 
 INTRO_LESSONS: list[LessonRow] = [
     (
@@ -514,7 +515,11 @@ def lessons_for(course_name: str) -> list[LessonRow] | None:
     """按课程名返回课时内容；免费入门课与付费课共用一份配置。"""
     if course_name.startswith("COPD 免费入门课"):
         return INTRO_LESSONS
-    return COPD_LESSONS.get(course_name) or EXT_LESSONS.get(course_name)
+    return (
+        COPD_LESSONS.get(course_name)
+        or EXT_LESSONS.get(course_name)
+        or EXT_LESSONS2.get(course_name)
+    )
 
 
 def appended_lessons_for(course_name: str) -> list[LessonRow]:

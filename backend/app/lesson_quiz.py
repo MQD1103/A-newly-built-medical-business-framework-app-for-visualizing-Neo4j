@@ -636,3 +636,8 @@ LESSON_QUIZ: dict[str, LessonCheck] = {
         "长期不清洗的水箱等于向空气喷细菌；湿度过高（>60%）也易滋生霉菌、加重胸闷。",
     ),
 }
+
+# ---------- 第三轮新增课程（course_content_ext2.py）----------
+from .lesson_quiz_ext import LESSON_QUIZ as _LESSON_QUIZ_EXT  # noqa: E402
+
+LESSON_QUIZ.update(_LESSON_QUIZ_EXT)
