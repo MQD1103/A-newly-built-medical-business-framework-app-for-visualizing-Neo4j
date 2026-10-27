@@ -46,6 +46,14 @@ interface QuizResult {
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
 
+/** 课后小自测题（后端 /api/lesson-quiz 下发，前端即时判分） */
+interface LessonCheckItem {
+  question: string
+  options: string[]
+  answer: number
+  explanation: string
+}
+
 /** 检索用归一化：统一小写并去掉空白与常见标点 */
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[\s,，。、；;：:/／|·\-—_]+/g, '')
@@ -74,7 +82,7 @@ export default function Courses() {
   const [marking, setMarking] = useState(false)
 
   // 课程搜索：关键词 + 课时知识点索引（首屏后台预取，检索全在本地完成）
-  const [keyword, setKeyword] = useState('')
+  const [keyword, setKeyword] = useState(() => searchParams.get('kw') || '')
   const [lessonIndex, setLessonIndex] = useState<Record<number, LessonIndexItem[]>>({})
 
 
@@ -86,6 +94,10 @@ export default function Courses() {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({})
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null)
   const [quizSubmitting, setQuizSubmitting] = useState(false)
+
+  // 课后小自测（按课时标题匹配，即时判分，不进成绩）
+  const [checks, setChecks] = useState<Record<string, LessonCheckItem>>({})
+  const [checkPick, setCheckPick] = useState<number | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
 
   const isAdmin = user?.role === 'admin'
@@ -197,10 +209,32 @@ export default function Courses() {
     }
   }, [activeId])
 
+  // 课后小自测题库：一次拉全，按课时标题匹配
+  useEffect(() => {
+    void api<{ items: Record<string, LessonCheckItem> }>('/api/lesson-quiz')
+      .then((d) => setChecks(d.items ?? {}))
+      .catch(() => setChecks({}))
+  }, [])
+
+  // 切换课时时清空上一题的作答
+  useEffect(() => {
+    setCheckPick(null)
+  }, [activeLessonId])
+
   const activeLesson = useMemo(
     () => lessonData?.lessons.find((x) => x.id === activeLessonId) ?? null,
     [lessonData, activeLessonId],
   )
+
+  const activeCheck = activeLesson ? checks[activeLesson.title] ?? null : null
+
+  const lessonPoints = useMemo(() => {
+    const raw = activeLesson?.summary ?? ''
+    return raw
+      .split('\n')
+      .map((line) => line.replace(/^[·•\-\s]+/, '').trim())
+      .filter(Boolean)
+  }, [activeLesson])
 
   const active = useMemo(
     () => courses.find((c) => c.id === activeId) ?? null,
@@ -467,7 +501,12 @@ export default function Courses() {
                 </svg>
               </span>
             </div>
-            <p className="course-search-hint">支持搜索课程名称、知识点关键词</p>
+            <p className="course-search-hint">
+              支持搜索课程名称、知识点关键词
+              <Link to="/toolkit" className="course-search-tool">
+                学习工具箱 ›
+              </Link>
+            </p>
           </div>
 
           {visibleCourses.length === 0 ? (
@@ -649,6 +688,94 @@ export default function Courses() {
                     >
                       {marking ? '记录中…' : '标记本节已学完'}
                     </button>
+                  ) : null}
+
+                  {activeLesson && !activeLesson.locked ? (
+                    <div className="lesson-extra">
+                      {lessonPoints.length ? (
+                        <div className="lesson-points">
+                          <strong>本节要点</strong>
+                          <ul>
+                            {lessonPoints.map((p) => (
+                              <li key={p}>{p}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      <div className="lesson-check">
+                        <div className="lesson-check-head">
+                          <strong>课后小自测</strong>
+                          <span className="meta">
+                            1 题 · 即时判分，不影响学习进度
+                          </span>
+                        </div>
+                        {activeCheck ? (
+                          <>
+                            <p className="lesson-check-q">
+                              {activeCheck.question}
+                            </p>
+                            <div className="lesson-check-options">
+                              {activeCheck.options.map((opt, i) => {
+                                const answered = checkPick !== null
+                                const isRight = answered && i === activeCheck.answer
+                                const isWrong =
+                                  answered && checkPick === i && i !== activeCheck.answer
+                                return (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    className={`lesson-check-option${isRight ? ' right' : ''}${
+                                      isWrong ? ' wrong' : ''
+                                    }`}
+                                    disabled={answered}
+                                    onClick={() => setCheckPick(i)}
+                                  >
+                                    <span className="opt-label">
+                                      {OPTION_LABELS[i] ?? i + 1}
+                                    </span>
+                                    <span>{opt}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            {checkPick !== null ? (
+                              <div className="lesson-check-result">
+                                <p
+                                  className={
+                                    checkPick === activeCheck.answer
+                                      ? 'ok-tip'
+                                      : 'error'
+                                  }
+                                >
+                                  {checkPick === activeCheck.answer
+                                    ? '回答正确 ✓'
+                                    : `正确答案：${
+                                        OPTION_LABELS[activeCheck.answer]
+                                      } · 再回看一遍上面的要点`}
+                                </p>
+                                {activeCheck.explanation ? (
+                                  <p className="meta">
+                                    解析：{activeCheck.explanation}
+                                  </p>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="linkish"
+                                  onClick={() => setCheckPick(null)}
+                                >
+                                  再答一次
+                                </button>
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <p className="muted">
+                            本节暂无自测题，先回顾上面的要点，学完标记即可。
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   ) : null}
                 </>
               )}

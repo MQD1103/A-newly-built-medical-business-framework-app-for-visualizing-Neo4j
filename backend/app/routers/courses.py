@@ -45,6 +45,27 @@ from ..schemas import (
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
+# 课后小自测：按课时标题返回题目，前端即时判分
+lesson_quiz_router = APIRouter(prefix="/api/lesson-quiz", tags=["courses"])
+
+
+@lesson_quiz_router.get("")
+def lesson_quiz_map(_: User = Depends(get_current_user)):
+    """每节课后的小自测题（一节一题，即时判分，不做成绩记录）。"""
+    from ..lesson_quiz import LESSON_QUIZ
+
+    return {
+        "items": {
+            title: {
+                "question": row[0],
+                "options": list(row[1]),
+                "answer": int(row[2]),
+                "explanation": row[3],
+            }
+            for title, row in LESSON_QUIZ.items()
+        }
+    }
+
 
 def enrolled_ids(db: Session, user: User) -> set[int]:
     return mall.accessible_course_ids(db, user)

@@ -27,6 +27,7 @@ import ServiceShop from './pages/ServiceShop'
 import Services from './pages/Services'
 import Supervision from './pages/Supervision'
 import SymptomDiary from './pages/SymptomDiary'
+import Toolkit from './pages/Toolkit'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="service-shop" element={<ServiceShop />} />
         <Route path="supervision" element={<Supervision />} />
         <Route path="materials" element={<Materials />} />
+        <Route path="toolkit" element={<Toolkit />} />
         <Route path="scores" element={<Scores />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="manage" element={<Manage />} />

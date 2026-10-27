@@ -102,6 +102,69 @@ DEMO_COPD_COURSES = [
         2.99,
         "/uploads/courses/copd-oxygen.svg",
     ),
+    (
+        "COPD 营养与饮食管理",
+        "COPD 系列",
+        "高蛋白饮食、少食多餐、胀气食物避雷、消瘦干预与合并糖尿病/高血压的吃法。",
+        2.99,
+        "/uploads/courses/copd-nutrition.svg",
+    ),
+    (
+        "COPD 运动康复训练",
+        "COPD 系列",
+        "步行、上下楼、上肢力量训练与强度把控，运动时气短的应急处理。",
+        2.99,
+        "/uploads/courses/copd-exercise.svg",
+    ),
+    (
+        "COPD 疫苗与预防感染",
+        "COPD 系列",
+        "流感与肺炎疫苗的接种时机、适用人群，以及日常防感冒、防交叉感染。",
+        2.99,
+        "/uploads/courses/copd-vaccine.svg",
+    ),
+    (
+        "COPD 心理调节与睡眠管理",
+        "COPD 系列",
+        "气短带来的焦虑与恐慌、失眠与夜间憋醒的改善，家属如何陪伴疏导。",
+        2.99,
+        "/uploads/courses/copd-mind.svg",
+    ),
+    (
+        "COPD 肺功能检查解读",
+        "COPD 系列",
+        "FEV1/FVC 等指标通俗讲解、气流受限分级与复查节奏，看懂自己的报告。",
+        2.99,
+        "/uploads/courses/copd-pft.svg",
+    ),
+    (
+        "COPD 合并症管理",
+        "COPD 系列",
+        "心脏病、胃食管反流、骨质疏松等常见合并症的识别、日常注意与相互影响。",
+        2.99,
+        "/uploads/courses/copd-comorbid.svg",
+    ),
+    (
+        "COPD 就医准备与复查随访",
+        "COPD 系列",
+        "复查带什么、问什么，何时挂急诊，住院前后与出院随访的准备事项。",
+        2.99,
+        "/uploads/courses/copd-visit.svg",
+    ),
+    (
+        "COPD 终末期安宁照护（进阶）",
+        "COPD 系列",
+        "以舒适与尊严为目标的照护：症状缓解、预立医疗意愿与家属支持。",
+        3.99,
+        "/uploads/courses/copd-palliative.svg",
+    ),
+    (
+        "COPD 无创呼吸机居家使用（进阶）",
+        "COPD 系列",
+        "无创呼吸机的适用人群、面罩佩戴、参数与清洁、外出与停电应急。",
+        3.99,
+        "/uploads/courses/copd-niv.svg",
+    ),
 ]
 
 # 旧版校园演示课名（队友若仍是这些，启动时会迁到 COPD）
@@ -259,12 +322,26 @@ def ensure_copd_courses(db: Session) -> None:
     has_legacy = bool(names & LEGACY_CAMPUS_COURSE_NAMES)
     has_copd = any(n.startswith("COPD") for n in names)
     if has_copd and not has_legacy:
-        # 已是 COPD：补封面 / 标价即可
+        # 已是 COPD：补封面 / 标价 / 新增课程
         changed = False
         by_name = {c.name: c for c in courses}
+        teacher = db.query(User).filter(User.username == "t1001").first()
+        tid = teacher.id if teacher else None
         for name, sem, desc, price, cover in DEMO_COPD_COURSES:
             c = by_name.get(name)
             if not c:
+                # 内容扩充后新增的课程：已有库启动时一并补上
+                db.add(
+                    Course(
+                        name=name,
+                        semester=sem,
+                        teacher_id=tid,
+                        description=desc,
+                        price=price,
+                        cover_url=cover,
+                    )
+                )
+                changed = True
                 continue
             if not (c.cover_url or "").strip():
                 c.cover_url = cover
@@ -396,9 +473,18 @@ def ensure_extra_admin(db: Session) -> None:
 COPD_PATH_LABELS = {
     "COPD 认识与早期筛查": "预防与预测",
     "COPD 呼吸康复入门": "预防与预测",
+    "COPD 运动康复训练": "预防与预测",
+    "COPD 疫苗与预防感染": "预防与预测",
+    "COPD 肺功能检查解读": "预防与预测",
     "COPD 用药与吸入装置指导": "患病管理",
     "COPD 急性加重自我管理": "患病管理",
     "COPD 家庭氧疗与日常护理": "患病管理",
+    "COPD 营养与饮食管理": "患病管理",
+    "COPD 心理调节与睡眠管理": "患病管理",
+    "COPD 合并症管理": "患病管理",
+    "COPD 就医准备与复查随访": "患病管理",
+    "COPD 终末期安宁照护（进阶）": "进阶学习",
+    "COPD 无创呼吸机居家使用（进阶）": "进阶学习",
 }
 
 COPD_TAGLINES = {
@@ -407,6 +493,15 @@ COPD_TAGLINES = {
     "COPD 用药与吸入装置指导": "把药吸对：常用药物与装置操作",
     "COPD 急性加重自我管理": "识别加重信号，知道何时就医",
     "COPD 家庭氧疗与日常护理": "家庭氧疗安全与日常照护要点",
+    "COPD 营养与饮食管理": "吃得对，才有力气呼吸",
+    "COPD 运动康复训练": "把活动耐力一点点练回来",
+    "COPD 疫苗与预防感染": "少一次感染，少一次加重",
+    "COPD 心理调节与睡眠管理": "管住焦虑，睡个好觉",
+    "COPD 肺功能检查解读": "看懂报告，不再靠猜",
+    "COPD 合并症管理": "心脏、反流、骨头都要一起管",
+    "COPD 就医准备与复查随访": "该问的问清楚，该来的别错过",
+    "COPD 终末期安宁照护（进阶）": "以舒适与尊严为目标的照护",
+    "COPD 无创呼吸机居家使用（进阶）": "家用无创通气的安全使用指南",
 }
 
 SERVICE_TAGLINES = {
@@ -455,16 +550,43 @@ def _replace_lessons(db: Session, course: Course) -> None:
     )
 
 
+def _append_lesson_rows(
+    db: Session, course: Course, rows, existing_titles: set[str], start_order: int
+) -> int:
+    """按标题去重追加课时，返回新增条数（不提交事务）。"""
+    order = start_order
+    added = 0
+    for title, duration, summary, _trial in rows:
+        if title in existing_titles:
+            continue
+        order += 1
+        db.add(
+            Lesson(
+                course_id=course.id,
+                title=title,
+                summary=summary,
+                video_url="",
+                duration_seconds=duration,
+                sort_order=order,
+                is_trial=False,
+            )
+        )
+        added += 1
+    return added
+
+
 def _ensure_lessons(db: Session, course: Course) -> None:
     """给没有课时的课程补一套课时；每个付费课程第 1 节可试看。
 
     依据《商业医疗APP技术说明》：免费入门课 2–3 节、每个付费板块 6–8 节、
     每节 8–12 分钟并配 3–5 条要点（见 course_content.py）。
-    若课程已有课时但仍是旧版三节占位课，则用真实内容替换。
+    若课程已有课时但仍是旧版三节占位课，则用真实内容替换；
+    若内容扩充后在末尾新增了小节，则按标题去重补写，不动原有课时与学习进度。
     """
     from . import course_content
 
     rows = course_content.lessons_for(course.name)
+    appended = course_content.appended_lessons_for(course.name)
 
     existing = (
         db.query(Lesson)
@@ -486,10 +608,23 @@ def _ensure_lessons(db: Session, course: Course) -> None:
                 _replace_lessons(db, course)
                 _add_lesson_rows(db, course, rows)
                 db.commit()
+                return
+
+        # 补充新增小节（原有课时与进度保持不变）
+        titles = {l.title for l in existing}
+        last_order = max(int(l.sort_order or 0) for l in existing)
+        added = _append_lesson_rows(db, course, rows or [], titles, last_order)
+        titles |= {r[0] for r in (rows or [])}
+        added += _append_lesson_rows(db, course, appended, titles, last_order + added)
+        if added:
+            db.commit()
         return
 
     if rows:
         _add_lesson_rows(db, course, rows)
+        if appended:
+            titles = {r[0] for r in rows}
+            _append_lesson_rows(db, course, appended, titles, len(rows))
         return
 
     # 未配置内容的课程：退回通用三节占位
@@ -612,20 +747,35 @@ def ensure_mall_catalog(db: Session) -> None:
         db.flush()
     if bundle:
         bundle.sort_order = bundle.sort_order or 10
-        has_items = (
-            db.query(CourseBundleItem.id)
+        items = (
+            db.query(CourseBundleItem)
             .filter(CourseBundleItem.bundle_id == bundle.id)
-            .first()
+            .order_by(CourseBundleItem.sort_order, CourseBundleItem.id)
+            .all()
         )
-        if not has_items:
-            for index, course in enumerate(singles):
-                db.add(
-                    CourseBundleItem(
-                        bundle_id=bundle.id,
-                        course_id=course.id,
-                        sort_order=index,
-                    )
+        have = {item.course_id for item in items}
+        next_order = max((int(i.sort_order or 0) for i in items), default=-1) + 1
+        added = 0
+        for course in singles:
+            if course.id in have:
+                continue
+            db.add(
+                CourseBundleItem(
+                    bundle_id=bundle.id,
+                    course_id=course.id,
+                    sort_order=next_order,
                 )
+            )
+            next_order += 1
+            added += 1
+        if added:
+            # 新增单课后整包同步扩容：原价 = 全部单课合计，售价维持 7 折。
+            # 管理员手动改过价格（不等于 7 折）时保持原价不动。
+            old_original = float(bundle.original_price or 0)
+            new_original = round(sum(float(c.price or 0) for c in singles), 2)
+            if old_original <= 0 or abs(float(bundle.price or 0) - round(old_original * 0.7, 2)) < 0.02:
+                bundle.original_price = new_original
+                bundle.price = round(new_original * 0.7, 2)
 
     # 课时
     for course in db.query(Course).order_by(Course.id).all():
