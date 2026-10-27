@@ -10,6 +10,7 @@ import Family from './pages/Family'
 import Friends from './pages/Friends'
 import Home from './pages/Home'
 import Hospital from './pages/Hospital'
+import HealthProfile from './pages/HealthProfile'
 import LinkedInfo from './pages/LinkedInfo'
 import Login from './pages/Login'
 import Mall from './pages/Mall'
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="manage" element={<Manage />} />
         <Route path="admin-user" element={<AdminUser />} />
         <Route path="profile" element={<ProfileEdit />} />
+        <Route path="health-profile" element={<HealthProfile />} />
         <Route path="linked" element={<LinkedInfo />} />
         <Route path="me" element={<Me />} />
       </Route>

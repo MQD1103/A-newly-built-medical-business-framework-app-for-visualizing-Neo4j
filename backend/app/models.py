@@ -910,3 +910,55 @@ class SymptomEntry(Base):
     )
 
     user: Mapped[User] = relationship()
+
+
+class HealthProfile(Base):
+    """个人健康档案：诊断、肺功能分级、用药史与紧急联系人。
+
+    每个用户一条（user_id 唯一）；仅本人与管理员可读写，供就诊时快速出示。
+    """
+
+    __tablename__ = "health_profiles"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_health_profile_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    # 个人信息
+    sex: Mapped[str] = mapped_column(String(10), default="")
+    birth_year: Mapped[str] = mapped_column(String(10), default="")
+    height_cm: Mapped[str] = mapped_column(String(10), default="")
+    weight_kg: Mapped[str] = mapped_column(String(10), default="")
+    blood_type: Mapped[str] = mapped_column(String(10), default="")
+
+    # 诊断与肺功能
+    diagnosis: Mapped[str] = mapped_column(String(120), default="")
+    diagnosed_at: Mapped[str] = mapped_column(String(20), default="")
+    copd_grade: Mapped[str] = mapped_column(String(20), default="")
+    fev1_percent: Mapped[str] = mapped_column(String(10), default="")
+    fev1_fvc: Mapped[str] = mapped_column(String(10), default="")
+    oxygen_target: Mapped[str] = mapped_column(String(30), default="")
+
+    # 用药与病史
+    current_meds: Mapped[str] = mapped_column(Text, default="")
+    allergies: Mapped[str] = mapped_column(Text, default="")
+    past_history: Mapped[str] = mapped_column(Text, default="")
+
+    # 紧急联系人
+    emergency_name: Mapped[str] = mapped_column(String(60), default="")
+    emergency_relation: Mapped[str] = mapped_column(String(30), default="")
+    emergency_phone: Mapped[str] = mapped_column(String(40), default="")
+
+    # 主治医生
+    doctor_name: Mapped[str] = mapped_column(String(60), default="")
+    doctor_hospital: Mapped[str] = mapped_column(String(120), default="")
+    doctor_dept: Mapped[str] = mapped_column(String(60), default="")
+    doctor_phone: Mapped[str] = mapped_column(String(40), default="")
+
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()

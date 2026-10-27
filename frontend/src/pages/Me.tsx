@@ -84,6 +84,13 @@ export default function Me() {
           <span>修改资料</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/health-profile" className="menu-row">
+          <span className="menu-row-main">
+            <span>🩺 个人健康档案</span>
+            <span className="meta">诊断 · 肺功能分级 · 用药 · 紧急联系人</span>
+          </span>
+          <span className="chev">›</span>
+        </Link>
         <Link to="/toolkit" className="menu-row">
           <span>学习工具箱 · 量表 / 记录表 / 手册</span>
           <span className="chev">›</span>

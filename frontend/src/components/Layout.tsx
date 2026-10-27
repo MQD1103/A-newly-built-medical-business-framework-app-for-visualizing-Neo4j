@@ -75,6 +75,12 @@ export default function Layout() {
                   let on = isActive
                   if (t.to === '/mall') on = mallActive
                   if (t.to === '/services') on = servicesActive
+                  if (t.to === '/me') {
+                    on =
+                      isActive ||
+                      pathname.startsWith('/health-profile') ||
+                      pathname.startsWith('/profile')
+                  }
                   return `tab-item${on ? ' active' : ''}`
                 }}
               >

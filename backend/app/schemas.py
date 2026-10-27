@@ -236,8 +236,11 @@ class ReminderCreate(BaseModel):
     due_at: datetime
     external_url: str = ""
     course_id: int | None = None
-    # general / medication / checkup
-    kind: str = Field(default="general", pattern="^(general|medication|checkup)$")
+    # general / medication / oxygen / rehab / vitals / checkup / assessment / vaccine
+    kind: str = Field(
+        default="general",
+        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
+    )
     drug_name: str = Field(default="", max_length=120)
     dosage: str = Field(default="", max_length=120)
     repeat_rule: str = Field(default="none", pattern="^(none|daily|weekly)$")
@@ -251,7 +254,10 @@ class ReminderUpdate(BaseModel):
     due_at: datetime | None = None
     external_url: str | None = None
     course_id: int | None = None
-    kind: str | None = Field(default=None, pattern="^(general|medication|checkup)$")
+    kind: str | None = Field(
+        default=None,
+        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
+    )
     drug_name: str | None = Field(default=None, max_length=120)
     dosage: str | None = Field(default=None, max_length=120)
     repeat_rule: str | None = Field(default=None, pattern="^(none|daily|weekly)$")
@@ -1100,3 +1106,47 @@ class SymptomDiaryOut(BaseModel):
     warning: bool = False
     warning_text: str = ""
     disclaimer: str = ""
+
+
+class HealthProfileIn(BaseModel):
+    """个人健康档案写入：全部可选，允许只填一部分后逐步补全。"""
+
+    sex: str = Field(default="", max_length=10)
+    birth_year: str = Field(default="", max_length=10)
+    height_cm: str = Field(default="", max_length=10)
+    weight_kg: str = Field(default="", max_length=10)
+    blood_type: str = Field(default="", max_length=10)
+
+    diagnosis: str = Field(default="", max_length=120)
+    diagnosed_at: str = Field(default="", max_length=20)
+    copd_grade: str = Field(default="", max_length=20)
+    fev1_percent: str = Field(default="", max_length=10)
+    fev1_fvc: str = Field(default="", max_length=10)
+    oxygen_target: str = Field(default="", max_length=30)
+
+    current_meds: str = Field(default="", max_length=4000)
+    allergies: str = Field(default="", max_length=2000)
+    past_history: str = Field(default="", max_length=4000)
+
+    emergency_name: str = Field(default="", max_length=60)
+    emergency_relation: str = Field(default="", max_length=30)
+    emergency_phone: str = Field(default="", max_length=40)
+
+    doctor_name: str = Field(default="", max_length=60)
+    doctor_hospital: str = Field(default="", max_length=120)
+    doctor_dept: str = Field(default="", max_length=60)
+    doctor_phone: str = Field(default="", max_length=40)
+
+    notes: str = Field(default="", max_length=2000)
+
+
+class HealthProfileOut(HealthProfileIn):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = 0
+    full_name: str = ""
+    username: str = ""
+    updated_at: datetime | None = None
+    # 档案完整度（0-100）与缺失项提示，前端用来引导补全
+    completeness: int = 0
+    missing: list[str] = Field(default_factory=list)

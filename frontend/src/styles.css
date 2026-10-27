@@ -6295,6 +6295,294 @@ textarea:focus {
   text-align: center;
 }
 
+/* ===== 提醒中心：分类筛选与模板 ===== */
+.rem-kind-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.rem-kind-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.rem-kind-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #4a5f76;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rem-kind-chip.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(91, 163, 245, 0.26);
+}
+
+.rem-kind-count {
+  font-size: 0.64rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(91, 163, 245, 0.12);
+  color: var(--blue-deep);
+}
+
+.rem-kind-chip.active .rem-kind-count {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.rem-kind-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rem-kind-pick-label {
+  font-size: 0.8rem;
+  color: #4a5f76;
+}
+
+.rem-kind-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.rem-kind-pick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fbfdff;
+  color: #4a5f76;
+  font-size: 0.66rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rem-kind-pick-item span {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.rem-kind-pick-item.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue-deep);
+  font-weight: 600;
+}
+
+.rem-template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rem-template {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 11px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fbfdff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.rem-template:hover {
+  border-color: var(--blue);
+  background: var(--blue-wash);
+}
+
+.rem-template-icon {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.rem-template strong {
+  font-size: 0.78rem;
+  color: #2f4a68;
+}
+
+.rem-template-title {
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ===== 个人健康档案 ===== */
+.hp-summary {
+  padding: 13px 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #eaf4ff 0%, #f7fbff 60%, #eef8f5 100%);
+  border: 1px solid #d9e9fb;
+  box-shadow: var(--shadow);
+}
+
+.hp-summary-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hp-summary-top strong {
+  display: block;
+  font-size: 0.92rem;
+  color: #274a6d;
+}
+
+.hp-summary-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: #5b7186;
+}
+
+.hp-pct {
+  flex: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--blue-deep);
+}
+
+.hp-bar {
+  height: 6px;
+  margin: 9px 0 7px;
+  border-radius: 999px;
+  background: rgba(91, 163, 245, 0.16);
+  overflow: hidden;
+}
+
+.hp-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7fbcf9, #3b86e0);
+  transition: width 0.3s ease;
+}
+
+.hp-summary-hint {
+  margin: 0;
+  font-size: 0.71rem;
+  line-height: 1.55;
+  color: #55708a;
+}
+
+.hp-updated {
+  margin: 5px 0 0;
+  font-size: 0.66rem;
+}
+
+.hp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.hp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hp-field.wide {
+  grid-column: 1 / -1;
+}
+
+.hp-field > span {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.hp-field input,
+.hp-field select {
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: #fbfdff;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.hp-field input:focus,
+.hp-field select:focus,
+.hp-textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(91, 163, 245, 0.14);
+}
+
+.hp-textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fbfdff;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.hp-bmi p {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #2f4a68;
+}
+
+.hp-bmi .meta {
+  font-weight: 400;
+  font-size: 0.68rem;
+}
+
+.hp-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media print {
+  .hp-actions {
+    display: none;
+  }
+
+  .hp-summary {
+    box-shadow: none;
+  }
+}
+
 @media print {
   .tabbar,
   .no-print,

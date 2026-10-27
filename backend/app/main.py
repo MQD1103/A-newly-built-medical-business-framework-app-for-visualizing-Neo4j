@@ -20,6 +20,7 @@ from .routers import (
     courses,
     friends,
     grades,
+    health,
     home,
     hospital,
     links,
@@ -103,6 +104,7 @@ app.include_router(links.router)
 app.include_router(hospital.router)
 app.include_router(ai.router)
 app.include_router(symptoms.router)
+app.include_router(health.router)
 app.include_router(home.router)
 app.include_router(admin.router)
 

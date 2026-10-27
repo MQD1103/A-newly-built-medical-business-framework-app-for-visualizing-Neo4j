@@ -72,7 +72,15 @@ export interface ServiceProduct {
   owned?: boolean
 }
 
-export type ReminderKind = 'general' | 'medication' | 'checkup'
+export type ReminderKind =
+  | 'general'
+  | 'medication'
+  | 'oxygen'
+  | 'rehab'
+  | 'vitals'
+  | 'checkup'
+  | 'assessment'
+  | 'vaccine'
 export type RepeatRule = 'none' | 'daily' | 'weekly'
 
 export interface Reminder {
@@ -464,4 +472,39 @@ export interface PushTestResult {
   failed: number
   total: number
   detail: string
+}
+
+/** 个人健康档案（与后端 /api/health-profile 对应） */
+export interface HealthProfile {
+  sex: string
+  birth_year: string
+  height_cm: string
+  weight_kg: string
+  blood_type: string
+  diagnosis: string
+  diagnosed_at: string
+  copd_grade: string
+  fev1_percent: string
+  fev1_fvc: string
+  oxygen_target: string
+  current_meds: string
+  allergies: string
+  past_history: string
+  emergency_name: string
+  emergency_relation: string
+  emergency_phone: string
+  doctor_name: string
+  doctor_hospital: string
+  doctor_dept: string
+  doctor_phone: string
+  notes: string
+}
+
+export interface HealthProfileOut extends HealthProfile {
+  id: number
+  full_name: string
+  username: string
+  updated_at: string | null
+  completeness: number
+  missing: string[]
 }
