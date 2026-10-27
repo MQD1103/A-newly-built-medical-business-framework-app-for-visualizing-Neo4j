@@ -46,6 +46,17 @@ interface QuizResult {
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F']
 
+/** 检索用归一化：统一小写并去掉空白与常见标点 */
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/[\s,，。、；;：:/／|·\-—_]+/g, '')
+}
+
+/** 课时索引：标题 + 要点，用于「知识点关键词」检索 */
+interface LessonIndexItem {
+  title: string
+  text: string
+}
+
 export default function Courses() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -61,6 +72,11 @@ export default function Courses() {
   const [activeLessonId, setActiveLessonId] = useState<number | null>(null)
   const [lessonError, setLessonError] = useState('')
   const [marking, setMarking] = useState(false)
+
+  // 课程搜索：关键词 + 课时知识点索引（首屏后台预取，检索全在本地完成）
+  const [keyword, setKeyword] = useState('')
+  const [lessonIndex, setLessonIndex] = useState<Record<number, LessonIndexItem[]>>({})
+
 
   // 板块测验状态
   const [quizOpen, setQuizOpen] = useState(false)
@@ -104,6 +120,32 @@ export default function Courses() {
   useEffect(() => {
     if (focusId) setActiveId(focusId)
   }, [focusId])
+
+  // 后台把每门课的课时标题+要点抓成检索索引，失败不影响其他功能
+  useEffect(() => {
+    if (!courses.length) return
+    let cancelled = false
+    void Promise.allSettled(
+      courses.map(async (c) => {
+        const data = await api<CourseLessons>(`/api/courses/${c.id}/lessons`)
+        const items: LessonIndexItem[] = data.lessons.map((l) => ({
+          title: l.title,
+          text: normalize(`${l.title} ${l.summary ?? ''}`),
+        }))
+        return [c.id, items] as const
+      }),
+    ).then((results) => {
+      if (cancelled) return
+      const map: Record<number, LessonIndexItem[]> = {}
+      for (const r of results) {
+        if (r.status === 'fulfilled') map[r.value[0]] = r.value[1]
+      }
+      setLessonIndex((prev) => ({ ...prev, ...map }))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [courses])
 
   useEffect(() => {
     if (activeId == null) {
@@ -176,6 +218,68 @@ export default function Courses() {
         ),
     [slots, activeId],
   )
+
+  /** 搜索结果：null 表示未搜索；命中时带上命中的课时标题（知识点） */
+  const searchHits = useMemo(() => {
+    const raw = keyword.trim()
+    if (!raw) return null
+    const terms = raw.split(/\s+/).map(normalize).filter(Boolean)
+    if (!terms.length) return null
+    const hits: { course: Course; lessons: string[] }[] = []
+    for (const c of courses) {
+      const lessons = lessonIndex[c.id] ?? []
+      const base = normalize(
+        [
+          c.name,
+          c.tagline ?? '',
+          c.path_label ?? '',
+          c.description ?? '',
+          c.semester,
+          c.teacher_name,
+        ].join(' '),
+      )
+      const baseHit = terms.every((t) => base.includes(t))
+      const hitLessons = lessons.filter((l) =>
+        terms.some((t) => l.text.includes(t)),
+      )
+      if (!baseHit && hitLessons.length === 0) continue
+      hits.push({
+        course: c,
+        lessons: [...new Set(hitLessons.map((l) => l.title))].slice(0, 2),
+      })
+    }
+    return hits
+  }, [keyword, courses, lessonIndex])
+
+  const visibleCourses = useMemo(
+    () => (searchHits ? searchHits.map((h) => h.course) : courses),
+    [searchHits, courses],
+  )
+
+  const lessonHint = useMemo(() => {
+    const map = new Map<number, string[]>()
+    for (const h of searchHits ?? []) {
+      if (h.lessons.length) map.set(h.course.id, h.lessons)
+    }
+    return map
+  }, [searchHits])
+
+  /** 当前详情只在「课程仍在可见列表里」时展示 */
+  const activeVisible =
+    !!active && visibleCourses.some((c) => c.id === active.id)
+
+  // 搜索把当前选中的课程过滤掉时，自动落到第一个命中项
+  useEffect(() => {
+    if (!searchHits || searchHits.length === 0) return
+    if (activeId != null && searchHits.some((h) => h.course.id === activeId)) {
+      return
+    }
+    setActiveId(searchHits[0].course.id)
+  }, [searchHits, activeId])
+
+  function clearSearch() {
+    setKeyword('')
+  }
 
   function selectCourse(id: number) {
     setActiveId(id)
@@ -319,32 +423,93 @@ export default function Courses() {
         <p className="muted">暂无在售课程</p>
       ) : (
         <>
-          <div className="course-card-grid">
-            {courses.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={`course-card${activeId === c.id ? ' active' : ''}`}
-                onClick={() => selectCourse(c.id)}
-              >
-                <div className="course-card-cover">
-                  <Cover src={c.cover_url} alt={c.name} />
-                  <span className="course-card-price">
-                    {priceText(c.price, isAdmin, PRICE_FALLBACK)}
-                  </span>
-                </div>
-                <div className="course-card-body">
-                  <strong>{c.name}</strong>
-                  <p className="meta">
-                    {c.semester}
-                    {isAdmin ? ' · 免费开放' : c.enrolled ? ' · 已开通' : ''}
-                  </p>
-                </div>
-              </button>
-            ))}
+          <div className="course-search">
+            <div className="course-search-box">
+              <input
+                type="search"
+                className="course-search-input"
+                value={keyword}
+                placeholder="输入课程关键词，如：氧疗、吸入药、急性加重"
+                aria-label="搜索课程"
+                onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') clearSearch()
+                }}
+              />
+              {keyword ? (
+                <button
+                  type="button"
+                  className="course-search-clear"
+                  aria-label="清空搜索"
+                  title="清空搜索"
+                  onClick={clearSearch}
+                >
+                  ×
+                </button>
+              ) : null}
+              <span className="course-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <circle
+                    cx="11"
+                    cy="11"
+                    r="6.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <path
+                    d="M16 16l4.2 4.2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            </div>
+            <p className="course-search-hint">支持搜索课程名称、知识点关键词</p>
           </div>
 
-          {active && (
+          {visibleCourses.length === 0 ? (
+            <div className="course-search-empty">
+              <p>没有找到与「{keyword.trim()}」相关的课程</p>
+              <button type="button" className="btn small" onClick={clearSearch}>
+                清空搜索
+              </button>
+            </div>
+          ) : (
+            <div className="course-card-grid">
+              {visibleCourses.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`course-card${activeId === c.id ? ' active' : ''}`}
+                  onClick={() => selectCourse(c.id)}
+                >
+                  <div className="course-card-cover">
+                    <Cover src={c.cover_url} alt={c.name} />
+                    <span className="course-card-price">
+                      {priceText(c.price, isAdmin, PRICE_FALLBACK)}
+                    </span>
+                  </div>
+                  <div className="course-card-body">
+                    <strong>{c.name}</strong>
+                    <p className="meta">
+                      {c.semester}
+                      {isAdmin ? ' · 免费开放' : c.enrolled ? ' · 已开通' : ''}
+                    </p>
+                    {lessonHint.get(c.id)?.length ? (
+                      <p className="meta course-card-hit">
+                        命中知识点：{lessonHint.get(c.id)?.[0]}
+                      </p>
+                    ) : null}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeVisible && active && (
             <section className="item-card course-detail">
               <div className="course-detail-cover">
                 <Cover src={active.cover_url} alt={active.name} />
@@ -392,7 +557,7 @@ export default function Courses() {
             </section>
           )}
 
-          {active && (
+          {activeVisible && active && (
             <section className="item-card lesson-section">
               <div className="lesson-head">
                 <h3 className="section-label">课时学习</h3>
@@ -518,7 +683,7 @@ export default function Courses() {
             </section>
           ) : null}
 
-          {(active?.enrolled || isAdmin) && (
+          {activeVisible && (active?.enrolled || isAdmin) && (
             <section className="item-card quiz-section">
               <div className="lesson-head">
                 <h3 className="section-label">板块测验</h3>
@@ -674,7 +839,7 @@ export default function Courses() {
             </section>
           )}
 
-          {(active?.enrolled || isAdmin) && (
+          {activeVisible && (active?.enrolled || isAdmin) && (
             <section>
               <h3 className="section-label">关联课表</h3>
               <ul className="slot-list">

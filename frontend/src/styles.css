@@ -1426,6 +1426,119 @@ textarea:focus {
   margin-bottom: 4px;
 }
 
+/* ---- 课程搜索栏（课程列表上方） ---- */
+.course-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.course-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(91, 163, 245, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(59, 134, 224, 0.08);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.course-search-box:focus-within {
+  border-color: var(--blue-deep);
+  box-shadow: 0 0 0 3px rgba(91, 163, 245, 0.22);
+}
+
+.course-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+  padding: 0.72rem 0.9rem;
+  color: var(--ink);
+}
+
+.course-search-input:focus {
+  outline: none;
+}
+
+.course-search-input::placeholder {
+  color: #9fb0c2;
+}
+
+/* 隐藏浏览器自带的 search 清除按钮，统一用自定义清空按钮 */
+.course-search-input::-webkit-search-cancel-button,
+.course-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.course-search-clear {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(122, 139, 158, 0.16);
+  color: #5d7288;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.course-search-clear:hover {
+  background: rgba(227, 93, 93, 0.16);
+  color: var(--danger);
+}
+
+.course-search-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0 12px 0 6px;
+  color: var(--blue-deep);
+}
+
+.course-search-hint {
+  margin: 0 0 0 4px;
+  font-size: 0.74rem;
+  color: #9aa9ba;
+}
+
+.course-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 16px;
+  border: 1px dashed rgba(91, 163, 245, 0.4);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.course-search-empty p {
+  margin: 0;
+}
+
+.course-card-hit {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  color: var(--blue-deep);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
 .course-detail-cover {
   margin: -4px -4px 12px;
   border-radius: 12px;

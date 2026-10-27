@@ -29,6 +29,11 @@ export interface Course {
   price: number
   cover_url?: string
   enrolled?: boolean
+  /** 商城字段：课程类型（single / bundle）、路径标签、副标题 */
+  course_type?: string
+  path_label?: string
+  tagline?: string
+  lesson_count?: number
 }
 
 export interface Lesson {
