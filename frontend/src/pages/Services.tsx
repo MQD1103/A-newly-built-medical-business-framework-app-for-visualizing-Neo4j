@@ -26,6 +26,12 @@ const entries = [
     tone: 'a' as const,
   },
   {
+    to: '/vitals',
+    title: '健康监测',
+    desc: '血氧 / 峰流速 / 体重 / 血压血糖',
+    tone: 'b' as const,
+  },
+  {
     to: '/ai-check',
     title: '用药动作检测',
     desc: '拍摄用药过程，检查步骤是否完成',

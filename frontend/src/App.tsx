@@ -29,6 +29,7 @@ import Services from './pages/Services'
 import Supervision from './pages/Supervision'
 import SymptomDiary from './pages/SymptomDiary'
 import Toolkit from './pages/Toolkit'
+import Vitals from './pages/Vitals'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="hospital" element={<Hospital />} />
         <Route path="ai-check" element={<AiCheck />} />
         <Route path="symptom-diary" element={<SymptomDiary />} />
+        <Route path="vitals" element={<Vitals />} />
         <Route path="courses" element={<Courses />} />
         <Route path="service-shop" element={<ServiceShop />} />
         <Route path="supervision" element={<Supervision />} />

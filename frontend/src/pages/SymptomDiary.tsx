@@ -120,6 +120,9 @@ export default function SymptomDiaryPage() {
           <h1>症状日记</h1>
           <p className="sub">每天记录咳嗽、气短与痰量，观察变化趋势</p>
         </div>
+        <Link to="/vitals" className="linkish">
+          健康监测 ›
+        </Link>
       </div>
 
       {error ? <p className="error">{error}</p> : null}

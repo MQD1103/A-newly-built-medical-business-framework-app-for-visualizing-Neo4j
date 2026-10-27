@@ -37,6 +37,7 @@ export default function Layout() {
     pathname.startsWith('/hospital') ||
     pathname.startsWith('/ai-check') ||
     pathname.startsWith('/symptom-diary') ||
+    pathname.startsWith('/vitals') ||
     pathname.startsWith('/notifications') ||
     pathname.startsWith('/linked')
 
