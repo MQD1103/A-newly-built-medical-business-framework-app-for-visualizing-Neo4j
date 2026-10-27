@@ -725,7 +725,9 @@ export default function Courses() {
                 {isAdmin
                   ? ' · 免费开放'
                   : active.enrolled
-                    ? ' · 已开通'
+                    ? active.expires_at
+                      ? ' · 已开通'
+                      : ' · 已开通 · 长期有效'
                     : active.expired
                       ? ' · 已过期'
                       : ' · 未开通'}
