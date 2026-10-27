@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiUrl, getToken } from '../api'
 import { useAuth } from '../auth'
-import { mediaUrl, roleLabel } from '../utils'
+import { mediaUrl, roleLabel, REPO_URL } from '../utils'
 
 export default function Me() {
   const { user, logout, refresh } = useAuth()
@@ -100,6 +100,18 @@ export default function Me() {
           <span>通知公告</span>
           <span className="chev">›</span>
         </Link>
+        <a
+          className="menu-row menu-row-link"
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="menu-row-main">
+            <span>GitHub 仓库</span>
+            <span className="meta">源码、提交记录与更新日志</span>
+          </span>
+          <span className="chev">↗</span>
+        </a>
       </section>
 
       <button type="button" className="btn block ghost-danger" onClick={logout}>

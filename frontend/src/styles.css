@@ -1289,6 +1289,54 @@ textarea:focus {
   font-size: 1.2rem;
 }
 
+/* 外链行（GitHub 仓库）：右侧用 ↗ 区分站内跳转 */
+.menu-row-link {
+  text-decoration: none;
+}
+
+.menu-row-link .chev {
+  color: var(--blue-deep);
+  font-size: 0.95rem;
+}
+
+.menu-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.menu-row-main .meta {
+  font-size: 0.7rem;
+}
+
+/* 登录页底部源码入口 */
+.login-repo {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  margin: 14px auto 4px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  color: #45688a;
+  font-size: 0.76rem;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.login-repo:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--blue-deep);
+}
+
+.login-repo-dot {
+  font-size: 0.72rem;
+  color: var(--blue);
+}
+
 /* Schedule week as horizontal days */
 .link-tabs {
   display: grid;
