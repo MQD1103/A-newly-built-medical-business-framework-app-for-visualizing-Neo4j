@@ -21,11 +21,22 @@ from urllib.parse import urlsplit
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from pywebpush import WebPushException, webpush
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import Notification, PushDelivery, PushSubscription, User
+
+try:  # 可选依赖：缺失时降级为「仅站内通知」，不影响后端启动
+    from pywebpush import WebPushException, webpush
+
+    PUSH_TRANSPORT_AVAILABLE = True
+except ImportError:  # pragma: no cover - 依赖缺失的降级路径
+
+    class WebPushException(Exception):  # type: ignore[no-redef]
+        response = None
+
+    webpush = None  # type: ignore[assignment]
+    PUSH_TRANSPORT_AVAILABLE = False
 
 logger = logging.getLogger("app.push")
 
@@ -279,6 +290,8 @@ def _send(
     subscription: PushSubscription, payload: str, config: VapidConfig
 ) -> tuple[bool, int | None, str]:
     try:
+        if webpush is None:  # 未安装 pywebpush：跳过推送，仅保留站内通知
+            return False, None, "未安装推送依赖 pywebpush"
         webpush(
             subscription_info={
                 "endpoint": subscription.endpoint,
