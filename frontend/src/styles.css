@@ -6814,3 +6814,483 @@ textarea:focus {
   color: var(--blue-deep);
   background: var(--blue-soft);
 }
+
+/* ============================================================
+ * 首页「呼吸感」视觉规范 v2
+ * 底色 #F6FAFF · 同心圆波纹 4% · 顶部漫射天光
+ * 毛玻璃球体（深灰文字）· 暖调齿边预警勋章 · 渐变虚线放射
+ * 动效原则：慢、静、低强度（老人友好，不做快闪/弹跳/彩色闪烁）
+ * ============================================================ */
+
+.home-neo {
+  position: relative;
+  background: #f6faff;
+}
+
+/* 顶部一层极淡漫射天光，向下自然消失，没有边界阴影 */
+.home-neo::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 52%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(250, 253, 255, 0.6) 42%,
+    rgba(246, 250, 255, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 稀疏同心圆呼吸波纹：透明度 4%，不仔细看看不到 */
+.home-neo::after {
+  content: '';
+  position: absolute;
+  left: 58%;
+  top: 40%;
+  width: 820px;
+  height: 820px;
+  transform: translate(-50%, -50%);
+  background: repeating-radial-gradient(
+    circle,
+    rgba(82, 151, 232, 0.05) 0 1px,
+    transparent 1px 52px
+  );
+  -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.55) 46%, transparent 74%);
+  mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.55) 46%, transparent 74%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-neo .neo-bar,
+.home-neo .neo-crumb,
+.home-neo .neo-body {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 顶部控件：统一浅蓝胶囊 ---------- */
+.home-neo .neo-bar {
+  background: transparent;
+  border: 0;
+  padding: 4px 4px 0;
+  gap: 10px;
+}
+
+.home-neo .neo-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(158deg, #cfe6fb, #9cc7f2 62%, #7fb2e8);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: 0 4px 10px rgba(82, 151, 232, 0.22);
+}
+
+.home-neo .neo-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-neo .neo-brand strong {
+  color: #333842;
+  font-size: 0.96rem;
+  letter-spacing: 0.02em;
+}
+
+.home-neo .neo-brand > div em {
+  color: #7a8494;
+  font-size: 0.68rem;
+  margin-top: 1px;
+}
+
+.home-neo .neo-chip {
+  background: #e6f2ff;
+  border: 1px solid #cfe4f9;
+  border-radius: 999px;
+  color: #3b4655;
+  font-size: 0.7rem;
+  padding: 7px 12px;
+  box-shadow: none;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.home-neo .neo-chip:hover {
+  background: #d7e8fb;
+  border-color: #bedaf6;
+}
+
+.home-neo .neo-chip.ghost {
+  background: #e6f2ff;
+  border: 1px solid #cfe4f9;
+  color: #4a5768;
+}
+
+.home-neo .neo-chip.ghost:active {
+  background: #d7e8fb;
+}
+
+/* ---------- 画布：去掉框与底色，融进页面 ---------- */
+.home-neo .neo-stage {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 20px;
+  margin-top: 2px;
+}
+
+/* ---------- 功能球：毛玻璃浅蓝，深灰文字 ---------- */
+.home-neo .neo-node {
+  width: 80px;
+  height: 80px;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(158deg, #f0f7ff 0%, #e6f2ff 34%, #c7e0fb 100%);
+  color: #333842;
+  gap: 3px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 20px rgba(94, 140, 196, 0.14),
+    0 0 0 5px rgba(214, 232, 251, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform 0.28s ease, box-shadow 0.32s ease;
+}
+
+.home-neo .neo-node::before {
+  inset: -4px;
+  background: radial-gradient(circle at 50% 118%, rgba(148, 189, 242, 0.22), transparent 66%);
+  opacity: 0.65;
+}
+
+.home-neo .neo-node:hover::before {
+  opacity: 1;
+}
+
+/* 悬浮：只轻微放大 + 光晕提亮，无闪光无弹跳 */
+.home-neo .neo-node:hover:not(.dragging):not(.float-rem) {
+  transform: translate(-50%, -50%) scale(1.03);
+  box-shadow:
+    0 10px 26px rgba(94, 140, 196, 0.18),
+    0 0 0 7px rgba(198, 224, 251, 0.4),
+    0 0 26px rgba(148, 189, 242, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.home-neo .neo-node:active {
+  transform: translate(-50%, -50%) scale(1.03);
+}
+
+.home-neo .neo-node-core {
+  color: #333842;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.home-neo .neo-node-sub {
+  color: #7a8494;
+  font-size: 0.58rem;
+  max-width: 74px;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- 中心「小医」 ---------- */
+.home-neo .neo-node.center {
+  width: 118px;
+  height: 118px;
+  gap: 5px;
+  background: linear-gradient(160deg, #f4f9ff 0%, #e6f2ff 40%, #c7e0fb 100%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 14px 34px rgba(82, 151, 232, 0.16),
+    0 0 0 12px rgba(214, 232, 251, 0.3),
+    0 0 46px rgba(148, 189, 242, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.home-neo .neo-node.center .neo-node-core {
+  font-size: 1.2rem;
+  letter-spacing: 0.06em;
+}
+
+.home-neo .neo-node.center .neo-node-sub {
+  font-size: 0.72rem;
+  max-width: 106px;
+  color: #7a8494;
+}
+
+/* 呼吸波纹：6s 一轮，三圈错开，由内向外舒展消散 */
+.home-neo .neo-breathe {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(148, 189, 242, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  animation: neo-breathe 6s cubic-bezier(0.25, 0.6, 0.35, 1) infinite;
+}
+
+.home-neo .neo-breathe.b2 {
+  animation-delay: 2s;
+}
+
+.home-neo .neo-breathe.b3 {
+  animation-delay: 4s;
+}
+
+@keyframes neo-breathe {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.38;
+  }
+  60% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(1.44);
+    opacity: 0;
+  }
+}
+
+/* 旧版「可进入下层」标记：规范里不需要，隐藏保持干净 */
+.home-neo .neo-drill-mark {
+  display: none;
+}
+
+/* ---------- 状态小点 + 球下小字 ---------- */
+.home-neo .neo-node-dot {
+  position: absolute;
+  top: 9px;
+  right: 13px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85);
+  z-index: 2;
+}
+
+.home-neo .neo-node-dot.blue {
+  background: #a9cef4;
+}
+
+.home-neo .neo-node-dot.amber {
+  background: #e8a767;
+}
+
+.home-neo .neo-node-dot.warm-red {
+  background: #e29a9a;
+}
+
+.home-neo .neo-node-meta {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 7px);
+  transform: translateX(-50%);
+  font-size: 0.58rem;
+  color: #9aa7b8;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 左侧预警勋章：哑光齿边，不连线 ---------- */
+.home-neo .neo-node.float-rem {
+  width: 80px;
+  height: 92px;
+  border-radius: 21px;
+  gap: 1px;
+  background: linear-gradient(166deg, #fdf4e8 0%, #f9e9d5 52%, #f2dfc7 100%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: #8a6a45;
+  cursor: pointer;
+  animation: medal-float 8s ease-in-out infinite;
+  box-shadow:
+    0 10px 22px rgba(214, 167, 103, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* 齿边：柔和圆点的哑光描边，不用锐角 */
+.home-neo .neo-node.float-rem::before {
+  inset: -6px;
+  border-radius: 27px;
+  background: none;
+  border: 2px dotted rgba(214, 184, 122, 0.7);
+  opacity: 1;
+}
+
+/* 顶部挂孔，像一枚徽章 */
+.home-neo .neo-node.float-rem::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: inset 0 0 0 1.5px rgba(214, 184, 122, 0.85);
+}
+
+.home-neo .neo-node.float-rem .medal-name {
+  font-size: 0.63rem;
+  font-weight: 600;
+  color: #8a6a45;
+  letter-spacing: 0.02em;
+}
+
+.home-neo .neo-node.float-rem .medal-num {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.02;
+  color: #b5763a;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-neo .neo-node.float-rem .medal-cap {
+  font-size: 0.5rem;
+  color: #a98a62;
+  white-space: nowrap;
+}
+
+.home-neo .neo-node.float-rem.urgency-warn::before {
+  border-color: rgba(232, 167, 103, 0.85);
+}
+
+.home-neo .neo-node.float-rem.urgency-urgent::before {
+  border-color: rgba(226, 150, 80, 0.9);
+}
+
+.home-neo .neo-node.float-rem.urgency-critical::before {
+  border-color: rgba(219, 133, 110, 0.95);
+}
+
+@keyframes medal-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-5px);
+  }
+}
+
+.neo-medal-caption {
+  position: absolute;
+  margin: 0;
+  width: 80px;
+  text-align: center;
+  font-size: 0.56rem;
+  color: #aeb9c7;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+/* ---------- 连线：中心稍深、向外渐淡的宽松虚线 ---------- */
+.home-neo .neo-edge {
+  stroke-width: 1.5;
+  stroke-dasharray: 7 9;
+  stroke-linecap: round;
+  opacity: 0.95;
+  fill: none;
+  filter: none;
+}
+
+.neo-edge-taper {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.home-neo .edge-active .neo-edge {
+  stroke-width: 1.9;
+  opacity: 1;
+}
+
+.home-neo .edge-active .neo-edge-taper {
+  stroke-width: 3;
+}
+
+/* ---------- 点击定格高亮 1.5s 后恢复 ---------- */
+.home-neo .neo-node.selected:not(.float-rem) {
+  box-shadow:
+    0 10px 24px rgba(82, 151, 232, 0.2),
+    0 0 0 8px rgba(148, 189, 242, 0.24),
+    0 0 30px rgba(148, 189, 242, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  animation: neo-hold 1.5s ease-out both;
+}
+
+@keyframes neo-hold {
+  0% {
+    filter: brightness(1.06);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* ---------- 入场：由中心向外依次淡入，间隔 0.4s ---------- */
+.neo-stage.intro .neo-node {
+  animation: neo-rise 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation-delay: var(--enter-delay, 0s);
+}
+
+.neo-stage.intro .neo-node.center {
+  animation-delay: 0s;
+}
+
+/* 勋章：位移交给漂浮动画，这里只补淡入，避免两条动画抢 transform */
+.neo-stage.intro .neo-node.float-rem {
+  animation:
+    medal-float 8s ease-in-out infinite,
+    neo-fade 0.7s ease-out both;
+  animation-delay: 0s, 1.2s;
+}
+
+@keyframes neo-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes neo-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 老人友好：系统要求减少动效时全部停掉 */
+@media (prefers-reduced-motion: reduce) {
+  .home-neo .neo-breathe,
+  .home-neo .neo-node.float-rem,
+  .neo-stage.intro .neo-node,
+  .neo-stage.intro .neo-node.float-rem,
+  .home-neo .neo-node.selected:not(.float-rem) {
+    animation: none !important;
+  }
+
+  .home-neo .neo-node,
+  .home-neo .neo-node:hover:not(.dragging):not(.float-rem) {
+    transition: none !important;
+  }
+}

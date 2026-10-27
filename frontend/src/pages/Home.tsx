@@ -30,13 +30,13 @@ type NodeMeta = Omit<NodeDef, 'x' | 'y'>
 
 /** 全量节点目录（各层共用） */
 const NODE_CATALOG: Record<string, NodeMeta> = {
-  me: { id: 'me', label: '我', sub: '当前用户', to: '/me', tone: 'center' },
-  schedule: { id: 'schedule', label: '服务', sub: '课表等服务', to: '/services', tone: 'a' },
-  remind: { id: 'remind', label: '提醒', sub: '服务内提醒', to: '/reminders', tone: 'b' },
-  notice: { id: 'notice', label: '公告', sub: '平台通知', to: '/notices', tone: 'c' },
-  course: { id: 'course', label: '商城', sub: '课程与监督', to: '/mall', tone: 'a' },
+  me: { id: 'me', label: '小医', sub: '', to: '/me', tone: 'center' },
+  schedule: { id: 'schedule', label: '服务', sub: '健康管理工具', to: '/services', tone: 'a' },
+  community: { id: 'community', label: '社区', sub: '病友 & 家属动态', to: '/community', tone: 'a' },
+  course: { id: 'course', label: '商城', sub: '课程、康复物资', to: '/mall', tone: 'a' },
+  remind: { id: 'remind', label: '提醒', sub: '用药复查提醒', to: '/reminders', tone: 'a' },
+  notice: { id: 'notice', label: '公告', sub: '平台科普通知', to: '/notices', tone: 'a' },
   calendar: { id: 'calendar', label: '校历', sub: '重要节点', to: '/schedule', tone: 'b' },
-  community: { id: 'community', label: '社区', sub: '小医动态', to: '/community', tone: 'c' },
   // 课表下层：教室并入「今日安排」卡片，不再单独成球
   today: { id: 'today', label: '今日安排', sub: '最多5堂课', to: '/schedule', tone: 'a' },
   week: { id: 'week', label: '本周', sub: '周一至周五', to: '/schedule', tone: 'b' },
@@ -64,7 +64,7 @@ const NODE_CATALOG: Record<string, NodeMeta> = {
  * 第3层动态球（同一套搜寻→隐其它→浮出，每层最多 5 球）。
  */
 const LAYER_CHILDREN: Record<string, string[]> = {
-  me: ['schedule', 'remind', 'notice', 'course', 'community'],
+  me: ['schedule', 'community', 'course', 'remind', 'notice'],
   schedule: ['today', 'week'],
   remind: ['due', 'online'],
   notice: ['school', 'urgent'],
@@ -112,6 +112,8 @@ const ROOT_ID = 'me'
 const MAX_LAYER_DEPTH = 3
 /** 第三层球体上限（一天最多五堂课 / 列表预览最多 5） */
 const MAX_L3_BALLS = 5
+/** 左侧预警勋章上限（少而精，多了会挤掉主视觉） */
+const MAX_MEDALS = 3
 const MAX_TODAY_SLOTS = MAX_L3_BALLS
 const WEEK_WORKDAYS = 5
 const SLOT_PREFIX = 'slot-'
@@ -147,6 +149,19 @@ function formatCountdown(dueAt: string, now: number): string {
   if (d > 0) return `${d}天${h}时`
   if (h > 0) return `${h}时${m}分`
   return `${Math.max(1, m)}分`
+}
+
+/** 勋章用：把剩余时间拆成「大数字 + 单位」，便于放大数字 */
+function countdownParts(dueAt: string, now: number): { value: string; unit: string } {
+  const left = new Date(dueAt).getTime() - now
+  if (!Number.isFinite(left) || left <= 0) return { value: '0', unit: '已到期' }
+  const totalMin = Math.floor(left / 60_000)
+  const d = Math.floor(totalMin / (60 * 24))
+  const h = Math.floor((totalMin % (60 * 24)) / 60)
+  const m = totalMin % 60
+  if (d > 0) return { value: String(d), unit: '天' }
+  if (h > 0) return { value: String(h), unit: '小时' }
+  return { value: String(Math.max(1, m)), unit: '分钟' }
 }
 
 /** 剩余时间占比（7 天窗），用于卡片进度条 */
@@ -248,11 +263,11 @@ function metaOf(id: string, userName?: string): NodeMeta {
     sub: '',
     tone: 'a' as NodeTone,
   }
-  if (id === ROOT_ID && userName) {
+  if (id === ROOT_ID) {
     return {
       ...base,
-      label: userName.slice(0, 1) || '我',
-      sub: userName,
+      label: '小医',
+      sub: userName ? `你好，${userName}` : '你好',
     }
   }
   return base
@@ -491,13 +506,14 @@ function separateAll(
 }
 
 /**
- * 第一层浮动提醒球：出现在画布左侧，不写入 edges（不连主键、不连其它子键）。
- * 可保留已有坐标，避免倒计时刷新时跳动。
+ * 第一层预警勋章：画布左侧独立成列，不写入 edges（不连主键、不连其它子键），
+ * 也不参与圆形节点的防重合推挤——它是挂件，不是网络节点。
  */
 function placeFloatingReminders(
   base: NodeDef[],
   w: number,
   h: number,
+  cx: number,
   reminders: Reminder[],
   now: number,
   keepPos?: Map<string, { x: number; y: number }>,
@@ -509,19 +525,17 @@ function placeFloatingReminders(
     }
   }
 
-  const active = activeFloatReminders(reminders, now)
-  if (!active.length) {
-    return base.filter((n) => !isFloatRemNodeId(n.id))
-  }
-
+  const active = activeFloatReminders(reminders, now).slice(0, MAX_MEDALS)
   const core = base.filter((n) => !isFloatRemNodeId(n.id))
-  const floats: NodeDef[] = active.map((r, i) => {
+  if (!active.length) return core
+
+  const colX = Math.max(44, w * 0.1)
+  const gap = Math.min(128, Math.max(104, h * 0.19))
+  const startY = h * 0.47 - ((active.length - 1) * gap) / 2
+
+  const medals: NodeDef[] = active.map((r, i) => {
     const nid = `${FLOAT_REM_PREFIX}${r.id}`
     remByNodeId[nid] = r
-    const n = active.length
-    const t = n === 1 ? 0.5 : i / (n - 1)
-    const fallback = { x: w * 0.14, y: h * (0.22 + t * 0.56) }
-    const pos = keepPos?.get(nid) ?? fallback
     const meta: NodeMeta = {
       id: nid,
       label: shortCourseLabel(r.title),
@@ -530,16 +544,60 @@ function placeFloatingReminders(
       tone: 'c',
     }
     dynamicMeta[nid] = meta
+    const fallback = { x: colX, y: startY + i * gap }
+    const pos = keepPos?.get(nid) ?? fallback
     return { ...meta, x: pos.x, y: pos.y }
   })
 
-  return separateAll([...core, ...floats], NODE_KEEP_DIST, core.find((n) => n.id === ROOT_ID)?.id ?? null)
+  // 左侧勋章尽量不压到中心与最左侧功能球
+  const minCx = Math.min(...core.filter((n) => n.id !== ROOT_ID).map((n) => n.x), cx)
+  const shifted = medals.map((m) => ({
+    ...m,
+    x: Math.min(m.x, Math.max(42, minCx - 86)),
+  }))
+  return [...core, ...shifted]
 }
 
 type LayoutOpts = {
   floatReminders?: Reminder[]
   now?: number
   keepFloatPos?: Map<string, { x: number; y: number }>
+}
+
+/**
+ * 首屏构图：中心「小医」略微偏右，5 个功能球等角环绕，左侧留出勋章列。
+ * 首屏是固定版式（不做防重合推挤），保证每次进入的视觉一致。
+ */
+function layoutRoot(width: number, height: number, userName: string, opts?: LayoutOpts): NodeDef[] {
+  // 窄屏（<380）球体本身会缩小，环半径相应放大一点，避免与中心球相切
+  const narrow = width < 380
+  const cx = width * 0.62
+  const cy = height * 0.47
+  const r = Math.min(width * (narrow ? 0.31 : 0.295), height * 0.22)
+  const childIds = getChildren(ROOT_ID)
+  const count = childIds.length
+  const laid: NodeDef[] = [{ ...metaOf(ROOT_ID, userName), tone: 'center', x: cx, y: cy }]
+
+  childIds.forEach((id, idx) => {
+    const ang = -Math.PI / 2 + (idx * 2 * Math.PI) / count
+    const meta = metaOf(id, userName)
+    laid.push({
+      ...meta,
+      tone: meta.tone === 'center' ? 'a' : meta.tone,
+      x: cx + Math.cos(ang) * r,
+      y: cy + Math.sin(ang) * r,
+    })
+  })
+
+  return placeFloatingReminders(
+    laid,
+    width,
+    height,
+    cx,
+    opts?.floatReminders ?? [],
+    opts?.now ?? Date.now(),
+    opts?.keepFloatPos,
+  )
 }
 
 /**
@@ -555,6 +613,7 @@ function layoutLayer(
 ): NodeDef[] {
   const width = Math.max(w, 280)
   const height = Math.max(h, 360)
+  if (primaryId === ROOT_ID) return layoutRoot(width, height, userName, opts)
   const cx = width * 0.5
   const cy = height * 0.5
   const childIds = getChildren(primaryId)
@@ -588,18 +647,7 @@ function layoutLayer(
     })
   }
 
-  const ring = separateAll(laid, NODE_KEEP_DIST, primaryId)
-  if (primaryId === ROOT_ID && opts?.floatReminders?.length) {
-    return placeFloatingReminders(
-      ring,
-      width,
-      height,
-      opts.floatReminders,
-      opts.now ?? Date.now(),
-      opts.keepFloatPos,
-    )
-  }
-  return ring
+  return separateAll(laid, NODE_KEEP_DIST, primaryId)
 }
 
 type PushResult = { list: NodeDef[]; bumped: string[] }
@@ -695,9 +743,13 @@ export default function Home() {
   const [edgeAnimKey, setEdgeAnimKey] = useState(0)
   const [seekFocusId, setSeekFocusId] = useState<string | null>(null)
   const [primarySettle, setPrimarySettle] = useState(false)
+  /** 首次进入的依次淡入：3.6s 后撤掉，避免和后续动效打架 */
+  const [intro, setIntro] = useState(true)
   const [infoCardId, setInfoCardId] = useState<string | null>(null)
   /** 第一层浮动提醒（未到期）；到期后先消散再移除 */
   const [floatReminders, setFloatReminders] = useState<Reminder[]>([])
+  /** 首屏球体角标用的汇总数 */
+  const [summary, setSummary] = useState({ todos: 0, notices: 0 })
   const [vanishingRemIds, setVanishingRemIds] = useState<string[]>([])
   const [nowTick, setNowTick] = useState(() => Date.now())
   const homeCache = useRef<HomeData | null>(null)
@@ -736,6 +788,17 @@ export default function Home() {
     NODE_CATALOG[primaryId]?.label ||
     '关系'
   const layerDepth = path.length
+  // 首屏左侧勋章列（独立挂件，不连线）
+  const medalNodes = nodes.filter((n) => isFloatRemNodeId(n.id))
+  const medalBottom = medalNodes.length ? Math.max(...medalNodes.map((n) => n.y)) + 62 : 0
+
+  /** 球体下方的小字补充（只在首屏、且有内容时出现） */
+  function metaLabelFor(id: string): string {
+    if (primaryId !== ROOT_ID) return ''
+    if (id === 'remind' && summary.todos > 0) return `${summary.todos}项待办`
+    if (id === 'notice' && summary.notices > 0) return `${summary.notices}条新通知`
+    return ''
+  }
   const dimmedSet = useMemo(() => new Set(dimmedIds), [dimmedIds])
   const enteringSet = useMemo(() => new Set(enteringIds), [enteringIds])
   const sinkingSet = useMemo(() => new Set(sinkingIds), [sinkingIds])
@@ -855,6 +918,30 @@ export default function Home() {
     void refreshFloatReminders()
   }, [])
 
+  // 入场序列跑完就撤掉标记（节点依次淡入 0.4s 间隔，最晚约 3.1s）
+  useEffect(() => {
+    const t = window.setTimeout(() => setIntro(false), 3600)
+    return () => window.clearTimeout(t)
+  }, [])
+
+  // 首屏角标：待办数 / 新通知数（一次轻量汇总，点开各层时才拉明细）
+  useEffect(() => {
+    let alive = true
+    api<HomeData>('/api/home')
+      .then((d) => {
+        if (!alive) return
+        homeCache.current = d
+        setSummary({
+          todos: d.upcoming_reminders.length,
+          notices: d.latest_notices.length,
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+
   // 倒计时心跳：开卡或临近截止时 1s，否则 15s
   useEffect(() => {
     const remOpen = !!(infoCardId && isRemNodeId(infoCardId))
@@ -904,7 +991,7 @@ export default function Home() {
               vanishingRemIds.includes(`${FLOAT_REM_PREFIX}${r.id}`),
           )
         : alive
-    const next = placeFloatingReminders(core, w, h, showList, nowTick, keep)
+    const next = placeFloatingReminders(core, w, h, w * 0.6, showList, nowTick, keep)
     targetsRef.current = next
     nodesRef.current = next
     setNodes(next)
@@ -1620,7 +1707,13 @@ export default function Home() {
     <div className="screen home-neo">
       <header className="neo-bar">
         <div className="neo-brand">
-          <span className="neo-dot" />
+          <span className="neo-avatar">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" draggable={false} />
+            ) : (
+              user?.full_name?.slice(0, 1) || '医'
+            )}
+          </span>
           <div>
             <strong>小医</strong>
             <em>你好，{user?.full_name}</em>
@@ -1765,7 +1858,7 @@ export default function Home() {
         </aside>
 
         <div
-          className={`neo-stage${seeking ? ' seeking' : ''}${canvasPanning ? ' panning' : ''}${dragId ? ' dragging-node' : ''}${dimmedIds.length ? ' dimming' : ''}${!edgesReady ? ' edges-pending' : ''}`}
+          className={`neo-stage${intro ? ' intro' : ''}${seeking ? ' seeking' : ''}${canvasPanning ? ' panning' : ''}${dragId ? ' dragging-node' : ''}${dimmedIds.length ? ' dimming' : ''}${!edgesReady ? ' edges-pending' : ''}`}
           ref={stageRef}
           onPointerDown={onStagePointerDown}
           onPointerMove={onStagePointerMove}
@@ -1811,6 +1904,27 @@ export default function Home() {
               viewBox={`${worldBox.x} ${worldBox.y} ${worldBox.w} ${worldBox.h}`}
               style={{ left: worldBox.x, top: worldBox.y }}
             >
+              <defs>
+                {layerEdges.map((e) => {
+                  const a = byId.get(e.from)
+                  const b = byId.get(e.to)
+                  if (!a || !b) return null
+                  return (
+                    <linearGradient
+                      key={`g-${e.from}-${e.to}`}
+                      id={`edge-g-${e.to}`}
+                      gradientUnits="userSpaceOnUse"
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                    >
+                      <stop offset="0%" stopColor="#94BDF2" />
+                      <stop offset="100%" stopColor="#D7E8FB" />
+                    </linearGradient>
+                  )
+                })}
+              </defs>
               {layerEdges.map((e) => {
                 const a = byId.get(e.from)
                 const b = byId.get(e.to)
@@ -1818,6 +1932,12 @@ export default function Home() {
                 if (dimmedSet.has(e.from) || dimmedSet.has(e.to)) return null
                 const active =
                   selected === e.from || selected === e.to || dragId === e.from || dragId === e.to
+                const stroke = `url(#edge-g-${e.to})`
+                // 靠近中心的短段略粗，向外用渐细的虚线，形成放射的收束感
+                const dx = b.x - a.x
+                const dy = b.y - a.y
+                const len = Math.hypot(dx, dy) || 1
+                const stub = Math.min(30, len * 0.24)
                 return (
                   <g key={`${e.from}-${e.to}`} className={active ? 'edge-active' : ''}>
                     <line
@@ -1826,13 +1946,15 @@ export default function Home() {
                       x2={b.x}
                       y2={b.y}
                       className="neo-edge soft-edge"
+                      style={{ stroke }}
                     />
                     <line
                       x1={a.x}
                       y1={a.y}
-                      x2={b.x}
-                      y2={b.y}
-                      className="neo-edge-flow"
+                      x2={a.x + (dx / len) * stub}
+                      y2={a.y + (dy / len) * stub}
+                      className="neo-edge-taper"
+                      style={{ stroke }}
                     />
                   </g>
                 )
@@ -1840,7 +1962,6 @@ export default function Home() {
             </svg>
 
             {nodes.map((n, i) => {
-              const showAvatar = n.id === ROOT_ID && !!user?.avatar_url
               const isPrimary = n.id === primaryId
               const drillable = !isPrimary && canDrillFrom(path.length, n.id)
               const entering = enteringSet.has(n.id)
@@ -1873,12 +1994,12 @@ export default function Home() {
                               ? '点击查看详情卡 · 双击打开页面'
                               : '子键 · 可拖动 / 双击打开页面'
                   }
-                  className={`neo-node ${isPrimary || seekingFocus ? 'center' : n.tone}${selected === n.id ? ' selected' : ''}${locateId === n.id ? ' locate' : ''}${dragId === n.id ? ' dragging' : ''}${bumpedIds.includes(n.id) ? ' bumped' : ''}${showAvatar ? ' has-photo' : ''}${isPrimary || seekingFocus ? ' is-primary' : ' is-child'}${drillable ? ' drillable' : ''}${entering ? ' emerge-water' : ''}${sinking ? ' sink-water' : ''}${dimmed ? ' neo-dim' : ''}${seekingFocus ? ' seek-focus' : ''}${isPrimary && primarySettle ? ' primary-settle' : ''}${floatRem ? ` float-rem urgency-${floatUrg}` : ''}${floatVanishing ? ' float-rem-vanish' : ''}`}
+                  className={`neo-node ${isPrimary || seekingFocus ? 'center' : n.tone}${selected === n.id ? ' selected' : ''}${locateId === n.id ? ' locate' : ''}${dragId === n.id ? ' dragging' : ''}${bumpedIds.includes(n.id) ? ' bumped' : ''}${isPrimary || seekingFocus ? ' is-primary' : ' is-child'}${drillable ? ' drillable' : ''}${entering ? ' emerge-water' : ''}${sinking ? ' sink-water' : ''}${dimmed ? ' neo-dim' : ''}${seekingFocus ? ' seek-focus' : ''}${isPrimary && primarySettle ? ' primary-settle' : ''}${floatRem ? ` float-rem urgency-${floatUrg}` : ''}${floatVanishing ? ' float-rem-vanish' : ''}`}
                   style={{
                     left: Number.isFinite(n.x) ? n.x : 0,
                     top: Number.isFinite(n.y) ? n.y : 0,
                     ['--ripple-delay' as string]: `${(i % 5) * 0.35}s`,
-                    ['--enter-delay' as string]: `${Math.min(i, 6) * 0.07}s`,
+                    ['--enter-delay' as string]: `${Math.min(i, 6) * 0.4}s`,
                   }}
                   onPointerDown={(e) => onNodePointerDown(n.id, e)}
                   onPointerMove={onNodePointerMove}
@@ -1892,24 +2013,60 @@ export default function Home() {
                     }
                   }}
                 >
-                  <span className="node-ripple" aria-hidden="true" />
+                  {/* 中心「小医」：6s 一圈的呼吸波纹，由内向外舒展消散 */}
+                  {isPrimary ? (
+                    <>
+                      <span className="neo-breathe b1" aria-hidden="true" />
+                      <span className="neo-breathe b2" aria-hidden="true" />
+                      <span className="neo-breathe b3" aria-hidden="true" />
+                    </>
+                  ) : null}
                   {entering && <span className="emerge-sheen" aria-hidden="true" />}
                   {drillable && !floatRem && <span className="neo-drill-mark" aria-hidden="true" />}
-                  {showAvatar ? (
-                    <img className="neo-node-photo" src={user.avatar_url} alt="" draggable={false} />
+                  {!isPrimary && !floatRem ? (
+                    <span
+                      className={`neo-node-dot ${
+                        n.id === 'notice' && summary.notices > 0
+                          ? 'warm-red'
+                          : n.id === 'remind' && summary.todos > 0
+                            ? 'amber'
+                            : 'blue'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {floatRem && remByNodeId[n.id] ? (
+                    (() => {
+                      const parts = countdownParts(remByNodeId[n.id].due_at, nowTick)
+                      return (
+                        <>
+                          <span className="medal-name">{n.label}</span>
+                          <span className="medal-num">{parts.value}</span>
+                          <span className="medal-cap">{parts.unit}后到期</span>
+                        </>
+                      )
+                    })()
                   ) : (
                     <>
                       <span className="neo-node-core">{n.label}</span>
-                      <span className="neo-node-sub">
-                        {floatRem && remByNodeId[n.id]
-                          ? formatCountdown(remByNodeId[n.id].due_at, nowTick)
-                          : n.sub}
-                      </span>
+                      <span className="neo-node-sub">{n.sub}</span>
                     </>
                   )}
+                  {!isPrimary && !floatRem && metaLabelFor(n.id) ? (
+                    <span className="neo-node-meta">{metaLabelFor(n.id)}</span>
+                  ) : null}
                 </div>
               )
             })}
+
+            {medalNodes.length > 0 && (
+              <p
+                className="neo-medal-caption"
+                style={{ top: medalBottom, left: Math.max(6, (medalNodes[0]?.x ?? 50) - 48) }}
+              >
+                临期事项提醒
+              </p>
+            )}
           </div>
 
           {infoCardId && activeSlot && (
@@ -2186,7 +2343,7 @@ export default function Home() {
             })()}
 
           <p className="neo-hint">
-            左侧无连线球=临期提醒 · 点开看倒计时变色 · 到期自动消失
+            点击功能球进入 · 拖动可调整位置 · 左侧为临期事项提醒
           </p>
         </div>
       </div>
