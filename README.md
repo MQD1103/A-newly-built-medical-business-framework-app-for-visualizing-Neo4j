@@ -5,6 +5,8 @@
 **仓库地址：**  
 https://github.com/MQD1103/A-newly-built-medical-business-framework-app-for-visualizing-Neo4j
 
+**贡献说明：** 各成员做了哪些模块、对应哪次提交，见 [`CONTRIBUTIONS.md`](CONTRIBUTIONS.md)。
+
 ## 协作方式（推荐）
 
 **GitHub = 代码 + 历史记忆**；**每人在自己电脑跑前后端**，互不依赖、不用占对方电脑。
