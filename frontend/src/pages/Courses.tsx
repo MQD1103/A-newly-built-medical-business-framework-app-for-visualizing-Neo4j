@@ -81,6 +81,10 @@ export default function Courses() {
   const [lessonError, setLessonError] = useState('')
   const [marking, setMarking] = useState(false)
 
+  // 点击课程卡片后滚动到详情区用
+  const detailRef = useRef<HTMLElement | null>(null)
+  const pendingScroll = useRef(false)
+
   // 课程搜索：关键词 + 课时知识点索引（首屏后台预取，检索全在本地完成）
   const [keyword, setKeyword] = useState(() => searchParams.get('kw') || '')
   const [lessonIndex, setLessonIndex] = useState<Record<number, LessonIndexItem[]>>({})
@@ -372,7 +376,18 @@ export default function Courses() {
     setQuizResult(null)
     setQuizError('')
     setSearchParams(id ? { id: String(id) } : {})
+    // 详情区在网格下方，点击后平滑滚过去，避免「点了没反应」
+    pendingScroll.current = true
   }
+
+  // 点击卡片后等详情渲染完成，再滚动到详情区
+  useEffect(() => {
+    if (!pendingScroll.current) return
+    pendingScroll.current = false
+    window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
+  }, [activeId, activeVisible])
 
   async function openQuiz() {
     if (!active || quizLoading) return
@@ -703,7 +718,7 @@ export default function Courses() {
           </div>
 
           {activeVisible && active && (
-            <section className="item-card course-detail">
+            <section ref={detailRef} className="item-card course-detail">
               <div className="course-detail-cover">
                 <Cover src={active.cover_url} alt={active.name} />
               </div>

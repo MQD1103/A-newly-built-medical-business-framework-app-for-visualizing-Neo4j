@@ -99,6 +99,13 @@ export default function Me() {
           <span>👨‍👩‍👧 家属照护专区</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/orders?type=course" className="menu-row">
+          <span className="menu-row-main">
+            <span>🧾 我的课程订单</span>
+            <span className="meta">购买记录 · 有效期 · 退款</span>
+          </span>
+          <span className="chev">›</span>
+        </Link>
         <Link to="/notifications" className="menu-row">
           <span>消息通知</span>
           <span className="chev">›</span>

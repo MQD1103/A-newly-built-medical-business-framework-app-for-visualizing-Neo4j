@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import type {
   MallMyCourse,
@@ -29,6 +29,9 @@ const STATUS_TONE: Record<string, string> = {
 }
 
 export default function Orders() {
+  const [searchParams] = useSearchParams()
+  // /orders?type=course ：只看课程订单（「我的」页入口）
+  const courseOnly = searchParams.get('type') === 'course'
   const [courses, setCourses] = useState<MallMyCourse[]>([])
   const [orders, setOrders] = useState<MallOrder[]>([])
   const [policy, setPolicy] = useState<MallRefundPolicy | null>(null)
@@ -161,15 +164,23 @@ export default function Orders() {
     )
   }
 
+  const visibleOrders = courseOnly
+    ? orders.filter((order) => order.product_type === 'course')
+    : orders
+
   return (
     <div className="screen stack-gap">
-      <Link to="/mall" className="back-link">
-        ← 返回商城
+      <Link to={courseOnly ? '/me' : '/mall'} className="back-link">
+        {courseOnly ? '← 返回我的' : '← 返回商城'}
       </Link>
       <div className="page-title">
         <div>
-          <h1>我的订单</h1>
-          <p className="sub">课程与服务的购买记录、退款与团购兑换</p>
+          <h1>{courseOnly ? '我的课程订单' : '我的订单'}</h1>
+          <p className="sub">
+            {courseOnly
+              ? '课程购买记录、有效期与退款'
+              : '课程与服务的购买记录、退款与团购兑换'}
+          </p>
         </div>
       </div>
 
@@ -245,11 +256,13 @@ export default function Orders() {
         <h3 className="section-label">购买记录</h3>
         {loading ? (
           <p className="muted">加载中…</p>
-        ) : orders.length === 0 ? (
-          <p className="muted">暂无订单</p>
+        ) : visibleOrders.length === 0 ? (
+          <p className="muted">
+            {courseOnly ? '暂无课程订单，去商城看看吧。' : '暂无订单'}
+          </p>
         ) : (
           <ul className="list-card">
-            {orders.map((order) => {
+            {visibleOrders.map((order) => {
               const info = refundInfo[order.order_no]
               const busy = busyNo === order.order_no
               return (
