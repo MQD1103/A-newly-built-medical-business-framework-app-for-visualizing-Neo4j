@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 
 from .. import push_service
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_roles
 from ..models import Notification, User
-from ..notification_service import now
+from ..notification_service import now, sync_learning_recall
 from ..rate_limit import SlidingWindowLimiter
 from ..schemas import (
     NotificationListOut,
@@ -117,6 +117,17 @@ def read_all(
     )
     db.commit()
     return {"ok": True, "updated": int(updated)}
+
+
+@router.post("/recall-scan")
+def run_learning_recall_scan(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin")),
+):
+    """手动触发一次学习召回扫描（调度器每分钟也会自动跑）。"""
+    created = sync_learning_recall(db)
+    db.commit()
+    return {"ok": True, "created_notifications": created}
 
 
 # ---------- 手机推送订阅 ----------

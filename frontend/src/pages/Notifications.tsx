@@ -23,6 +23,7 @@ const TRIGGER_LABEL: Record<string, string> = {
   '7d': '提前 7 天',
   '1d': '提前 1 天',
   due: '到期提醒',
+  recall: '学习召回',
 }
 
 function triggerLabel(key: string): string {
