@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -9,9 +9,9 @@ $VenvDir = Join-Path $Backend '.venv'
 $NodeModules = Join-Path $Frontend 'node_modules'
 $PipMirror = 'https://pypi.tuna.tsinghua.edu.cn/simple'
 $BackendHost = '127.0.0.1'
-$BackendPort = 8000
+$BackendPort = 8001
 $FrontendHost = '127.0.0.1'
-$FrontendPort = 5173
+$FrontendPort = 5174
 
 function Test-PortListen([int]$Port) {
   try {
@@ -66,12 +66,17 @@ if (-not (Test-Path -LiteralPath (Join-Path $Backend 'requirements.txt'))) {
 
 $npm = Get-Command npm -ErrorAction SilentlyContinue
 if (-not $npm) {
+  # 本机便携版 Node.js 兜底（未加入系统 PATH 时也能启动）
+  $NodeFallback = 'C:\Users\32464\AppData\Roaming\TRAE SOLO CN\ModularData\ai-agent\work-mode-projects\6ad4abbe301fd88a4999ab4e\nodejs'
+  if (Test-Path -LiteralPath (Join-Path $NodeFallback 'npm.cmd')) {
+    $env:Path = "$NodeFallback;$env:Path"
+    $npm = Get-Command npm -ErrorAction SilentlyContinue
+  }
+}
+if (-not $npm) {
   Write-Host '[错误] 未找到 npm。请先安装 Node.js（勾选加入 PATH）后重试。' -ForegroundColor Red
   exit 1
 }
-
-$Requirements = Join-Path $Backend 'requirements.txt'
-$RequirementsStamp = Join-Path $VenvDir 'requirements.sha256'
 
 # 首次：自动创建后端虚拟环境并安装依赖
 if (-not (Test-Path -LiteralPath $VenvPython)) {
@@ -91,33 +96,8 @@ if (-not (Test-Path -LiteralPath $VenvPython)) {
     exit 1
   }
   & $VenvPython -m pip install --upgrade pip -i $PipMirror
-  & $VenvPython -m pip install -r $Requirements -i $PipMirror --timeout 60 --retries 5
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host '[错误] 后端依赖安装失败，请检查网络后重试。' -ForegroundColor Red
-    exit 1
-  }
-  (Get-FileHash -Algorithm SHA256 -LiteralPath $Requirements).Hash |
-    Set-Content -LiteralPath $RequirementsStamp -Encoding ASCII
+  & $VenvPython -m pip install -r (Join-Path $Backend 'requirements.txt') -i $PipMirror --timeout 60 --retries 5
   Write-Host '[成功] 后端依赖已安装。' -ForegroundColor Green
-}
-
-# 已有的虚拟环境：requirements.txt 变更后自动补装（例如新增的手机通知依赖）
-if (Test-Path -LiteralPath $VenvPython) {
-  $requirementsHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Requirements).Hash
-  $installedHash = ''
-  if (Test-Path -LiteralPath $RequirementsStamp) {
-    $installedHash = (Get-Content -LiteralPath $RequirementsStamp -Raw).Trim()
-  }
-  if ($installedHash -ne $requirementsHash) {
-    Write-Step '检测到后端依赖有更新，正在安装（可能需要几分钟）...'
-    & $VenvPython -m pip install -r $Requirements -i $PipMirror --timeout 60 --retries 5
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host '[错误] 后端依赖安装失败，请检查网络；也可手动执行 backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt' -ForegroundColor Red
-      exit 1
-    }
-    Set-Content -LiteralPath $RequirementsStamp -Value $requirementsHash -Encoding ASCII
-    Write-Host '[成功] 后端依赖已更新。' -ForegroundColor Green
-  }
 }
 
 # 首次：自动安装前端依赖

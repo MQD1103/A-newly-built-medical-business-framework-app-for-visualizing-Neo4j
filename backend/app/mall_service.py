@@ -20,6 +20,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .models import (
+    CartItem,
     Course,
     CourseBundleItem,
     CourseOrderSeat,
@@ -46,8 +47,6 @@ ORDER_TTL_MINUTES = 15
 REFUND_WINDOW_DAYS = 7
 REFUND_PROGRESS_LIMIT = 20.0  # 百分比
 MAX_GROUP_QUANTITY = 200
-# 学习权剩余天数 ≤ 该值时，前端提示「即将到期，可续期」
-EXPIRING_SOON_DAYS = 30
 
 REFUND_POLICY = (
     "购买后 7 天内且付费课时完成进度低于 20%，可申请全额退款；"
@@ -197,49 +196,6 @@ def course_access_info(
 
 def has_course_access(db: Session, user: User, course: Course) -> bool:
     return course_access_info(db, user, course)[0]
-
-
-def days_left(expires_at: datetime | None, current: datetime | None = None) -> int | None:
-    """学习权剩余天数（不足一天按一天算）；长期有效返回 None。"""
-    if expires_at is None:
-        return None
-    current = current or now()
-    seconds = (expires_at - current).total_seconds()
-    if seconds <= 0:
-        return 0
-    return int(-(-seconds // 86400))
-
-
-def enrollment_expiry_map(db: Session, user_id: int) -> dict[int, dict]:
-    """一次查出该用户全部学习权（含已过期），供课程列表判定有效期状态。
-
-    返回 {course_id: {"expires_at": datetime|None, "expired": bool}}：
-    - 长期有效（expires_at 为空）优先，其次取最晚到期时间；
-    - 全为已过期记录时 expired=True，前端显示「已过期·可续期」。
-    """
-    rows = (
-        db.query(Enrollment)
-        .filter(Enrollment.student_id == user_id)
-        .all()
-    )
-    current = now()
-    result: dict[int, dict] = {}
-    for row in rows:
-        item = result.setdefault(
-            row.course_id, {"expires_at": None, "permanent": False, "expired": True}
-        )
-        if row.expires_at is None:
-            item["permanent"] = True
-            item["expired"] = False
-            continue
-        if row.expires_at > current:
-            item["expired"] = False
-            if item["expires_at"] is None or row.expires_at > item["expires_at"]:
-                item["expires_at"] = row.expires_at
-    for item in result.values():
-        if item["permanent"]:
-            item["expires_at"] = None
-    return result
 
 
 def accessible_course_ids(db: Session, user: User) -> set[int]:
@@ -465,8 +421,7 @@ def grant_course_enrollment(
     # 长期有效（管理员开通/演示数据）不被短期购买覆盖
     if enrollment.expires_at is None:
         return enrollment
-    # 已过期、或本次到期时间更晚（续期/重购）时刷新。
-    # 续期叠加在 pay_course_order 里按「剩余有效期 + 本次时长」算好，这里直接落库。
+    # 已过期或即将过期：用本次购买刷新
     if enrollment.expires_at <= current or (
         expires_at is not None and expires_at > enrollment.expires_at
     ):
@@ -691,7 +646,6 @@ def create_course_order(
     channel: str = "mock",
     learners: list | None = None,
     remark: str = "",
-    renew: bool = False,
 ) -> CoursePurchase:
     course = db.get(Course, product_id)
     if not course:
@@ -702,29 +656,8 @@ def create_course_order(
         raise MallError("该课程已下架", 409)
     if course_is_free(course):
         raise MallError("免费课程无需下单，登录后可直接学习", 400)
-
-    access, _, access_source = course_access_info(db, user, course)
-    # 该课的直接学习权是否来自购买（用来判断能不能续期：过期后同样可以续期）
-    direct = (
-        db.query(Enrollment)
-        .filter(
-            Enrollment.student_id == user.id,
-            Enrollment.course_id == course.id,
-        )
-        .first()
-    )
-    can_renew = bool(
-        direct
-        and (direct.source or "") == "purchase"
-        and int(course.valid_days or 0) > 0
-        and (not access or access_source == "purchase")
-    )
-    if access and not renew:
+    if has_course_access(db, user, course):
         raise MallError("已拥有该课程，无需重复购买", 409)
-    if renew and not can_renew:
-        raise MallError("当前学习权不支持续期（长期有效或由整包开通）", 409)
-    if renew and quantity > 1:
-        raise MallError("续期一次只能续一门课程", 400)
     if quantity < 1 or quantity > MAX_GROUP_QUANTITY:
         raise MallError(f"购买数量需在 1–{MAX_GROUP_QUANTITY} 之间", 400)
     if course.course_type == "bundle" and quantity > 1:
@@ -746,8 +679,6 @@ def create_course_order(
             order_type = "upgrade"
             upgrade_sources = quote["orders"]
 
-    if renew:
-        order_type = "renew"
     current = now()
     order = CoursePurchase(
         user_id=user.id,
@@ -863,15 +794,10 @@ def pay_course_order(
     order.channel = (channel or order.channel or "mock").strip() or "mock"
     order.transaction_id = (transaction_id or "").strip()
     order.paid_at = current
-    valid_days = int(course.valid_days or 0)
-    # 续期订单：新的到期时间从「当前剩余有效期」往后叠加，而不是从今天重算
-    renew_base = current
-    if order.order_type == "renew":
-        existing = active_enrollment(db, order.user_id, order.course_id)
-        if existing and existing.expires_at:
-            renew_base = existing.expires_at
     order.valid_until = (
-        renew_base + timedelta(days=valid_days) if valid_days > 0 else None
+        current + timedelta(days=int(course.valid_days or 0))
+        if int(course.valid_days or 0) > 0
+        else None
     )
 
     for seat in order.seats:
@@ -1510,3 +1436,74 @@ def service_order_out(
         refundable=bool(check and check["eligible"]),
         refund_hint=(check["reason"] if check else ""),
     )
+
+
+# ---------------------------------------------------------------------------
+# 购物车（电商闭环：加车 → 结算 → 下单）
+# ---------------------------------------------------------------------------
+
+def list_cart_items(db: Session, user_id: int) -> list[CartItem]:
+    """按加入时间升序返回购物车条目。"""
+    return (
+        db.query(CartItem)
+        .filter(CartItem.user_id == user_id)
+        .order_by(CartItem.created_at.asc(), CartItem.id.asc())
+        .all()
+    )
+
+
+def cart_has_course(db: Session, user_id: int, course_id: int) -> bool:
+    return (
+        db.query(CartItem.id)
+        .filter(CartItem.user_id == user_id, CartItem.course_id == course_id)
+        .first()
+        is not None
+    )
+
+
+def add_cart_item(db: Session, user_id: int, course_id: int) -> CartItem:
+    """把一门在售付费课加入购物车；免费入门课与重复项按幂等处理。"""
+    course = db.get(Course, course_id)
+    if not course:
+        raise MallError("课程不存在", 404)
+    if course.course_type == "intro":
+        raise MallError("免费入门课可直接学习，无需加入购物车", 400)
+    if course.status != "on":
+        raise MallError("该课程已下架", 400)
+
+    existing = (
+        db.query(CartItem)
+        .filter(CartItem.user_id == user_id, CartItem.course_id == course_id)
+        .first()
+    )
+    if existing:
+        return existing
+
+    item = CartItem(user_id=user_id, course_id=course_id)
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def remove_cart_item(db: Session, user_id: int, course_id: int) -> bool:
+    """从购物车移除一门课程，返回是否真的删除了。"""
+    item = (
+        db.query(CartItem)
+        .filter(CartItem.user_id == user_id, CartItem.course_id == course_id)
+        .first()
+    )
+    if not item:
+        return False
+    db.delete(item)
+    db.commit()
+    return True
+
+
+def clear_cart(db: Session, user_id: int) -> int:
+    """清空购物车，返回删除条数。"""
+    rows = db.query(CartItem).filter(CartItem.user_id == user_id).delete(
+        synchronize_session=False
+    )
+    db.commit()
+    return int(rows)

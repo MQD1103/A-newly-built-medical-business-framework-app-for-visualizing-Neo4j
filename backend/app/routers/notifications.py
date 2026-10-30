@@ -1,25 +1,15 @@
-"""站内通知：提醒触发后的收件箱 + 手机推送订阅。"""
+"""站内通知：提醒触发后的收件箱。"""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from .. import push_service
 from ..database import get_db
-from ..deps import get_current_user, require_roles
+from ..deps import get_current_user
 from ..models import Notification, User
-from ..notification_service import now, sync_learning_recall
-from ..rate_limit import SlidingWindowLimiter
-from ..schemas import (
-    NotificationListOut,
-    NotificationOut,
-    PushSubscriptionIn,
-    PushUnsubscribeIn,
-)
+from ..notification_service import now
+from ..schemas import NotificationListOut, NotificationOut
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
-
-# 测试推送会真正调用推送服务，限制频率避免误触刷屏
-push_test_limiter = SlidingWindowLimiter(5, 60)
 
 
 def to_out(item: Notification) -> NotificationOut:
@@ -37,7 +27,6 @@ def to_out(item: Notification) -> NotificationOut:
         created_at=item.created_at,
         read_at=item.read_at,
         read=item.read_at is not None,
-        click_url=push_service.click_url(item),
     )
 
 
@@ -117,93 +106,6 @@ def read_all(
     )
     db.commit()
     return {"ok": True, "updated": int(updated)}
-
-
-@router.post("/recall-scan")
-def run_learning_recall_scan(
-    db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin")),
-):
-    """手动触发一次学习召回扫描（调度器每分钟也会自动跑）。"""
-    created = sync_learning_recall(db)
-    db.commit()
-    return {"ok": True, "created_notifications": created}
-
-
-# ---------- 手机推送订阅 ----------
-
-
-@router.get("/push/config")
-def push_config():
-    """前端订阅所需的公开配置；私钥永远不出服务端。"""
-    return push_service.public_config()
-
-
-@router.get("/push/status")
-def push_status(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    return push_service.status_for_user(db, user)
-
-
-@router.post("/push/subscribe")
-def push_subscribe(
-    body: PushSubscriptionIn,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    try:
-        row = push_service.save_subscription(
-            db,
-            user,
-            endpoint=body.endpoint,
-            p256dh=body.keys.p256dh,
-            auth=body.keys.auth,
-            user_agent=body.user_agent,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {
-        "ok": True,
-        "id": row.id,
-        "subscriptions": push_service.status_for_user(db, user)["subscriptions"],
-    }
-
-
-@router.post("/push/unsubscribe")
-def push_unsubscribe(
-    body: PushUnsubscribeIn,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    removed = push_service.remove_subscription(db, user, body.endpoint)
-    return {
-        "ok": True,
-        "removed": removed,
-        "subscriptions": push_service.status_for_user(db, user)["subscriptions"],
-    }
-
-
-@router.post("/push/test")
-def push_test(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    retry_after = push_test_limiter.retry_after(str(user.id))
-    if retry_after:
-        raise HTTPException(
-            status_code=429,
-            detail=f"操作太频繁，请 {retry_after} 秒后再试",
-        )
-    push_test_limiter.hit(str(user.id))
-    try:
-        result = push_service.send_test(db, user)
-    except push_service.PushNotConfigured as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except push_service.NoPushSubscription as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": result["sent"] > 0, **result}
 
 
 @router.post("/{notification_id}/read", response_model=NotificationOut)

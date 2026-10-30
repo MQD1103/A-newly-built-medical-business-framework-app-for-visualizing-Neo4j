@@ -1,6 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
-import HelperOrb from './HelperOrb'
 
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
@@ -26,19 +25,12 @@ export default function Layout() {
     pathname.startsWith('/service-shop') ||
     pathname.startsWith('/supervision') ||
     pathname.startsWith('/materials') ||
-    pathname.startsWith('/scores') ||
-    pathname.startsWith('/family') ||
-    pathname.startsWith('/orders')
+    pathname.startsWith('/scores')
 
   const servicesActive =
     pathname.startsWith('/services') ||
     pathname.startsWith('/schedule') ||
     pathname.startsWith('/reminders') ||
-    pathname.startsWith('/hospital') ||
-    pathname.startsWith('/ai-check') ||
-    pathname.startsWith('/symptom-diary') ||
-    pathname.startsWith('/vitals') ||
-    pathname.startsWith('/notifications') ||
     pathname.startsWith('/linked')
 
   return (
@@ -62,8 +54,6 @@ export default function Layout() {
         <main className="app-main">
           <Outlet />
         </main>
-        {/* 首页小助手：球体入口，输入文字即可跳到对应功能 */}
-        {pathname === '/' && <HelperOrb />}
         {!hideTab && (
           <nav className="tabbar" aria-label="主导航">
             {tabs.map((t) => (
@@ -75,12 +65,6 @@ export default function Layout() {
                   let on = isActive
                   if (t.to === '/mall') on = mallActive
                   if (t.to === '/services') on = servicesActive
-                  if (t.to === '/me') {
-                    on =
-                      isActive ||
-                      pathname.startsWith('/health-profile') ||
-                      pathname.startsWith('/profile')
-                  }
                   return `tab-item${on ? ' active' : ''}`
                 }}
               >

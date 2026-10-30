@@ -8,7 +8,5 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.2.1
 python-multipart==0.0.20
 email-validator==2.2.0
-# 手机 Web Push（VAPID 签名 + aes128gcm 加密）
-pywebpush==2.5.0
 # 正式库把 DATABASE_URL 指向 mysql+pymysql://... 时使用
 PyMySQL==1.1.1

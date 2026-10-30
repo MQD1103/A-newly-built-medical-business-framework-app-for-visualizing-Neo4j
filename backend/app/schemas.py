@@ -76,8 +76,6 @@ class CourseCreate(BaseModel):
     sort_order: int = 0
     valid_days: int = Field(default=730, ge=0)
     trial_lesson_count: int = Field(default=1, ge=0)
-    category: str = Field(default="", max_length=40)
-    audience: str = Field(default="", max_length=40)
 
 
 class CourseUpdate(BaseModel):
@@ -97,8 +95,6 @@ class CourseUpdate(BaseModel):
     sort_order: int | None = None
     valid_days: int | None = Field(default=None, ge=0)
     trial_lesson_count: int | None = Field(default=None, ge=0)
-    category: str | None = Field(default=None, max_length=40)
-    audience: str | None = Field(default=None, max_length=40)
 
 
 class CourseOut(BaseModel):
@@ -122,17 +118,9 @@ class CourseOut(BaseModel):
     sort_order: int = 0
     valid_days: int = 730
     trial_lesson_count: int = 1
-    category: str = ""
-    audience: str = ""
     lesson_count: int = 0
     # 当前用户的学习权到期时间；为空且 enrolled=True 表示长期有效
     expires_at: datetime | None = None
-    # 学习权剩余天数（向上取整）；为空表示长期有效或未开通
-    days_left: int | None = None
-    # 剩余天数 ≤ 30 天，前端据此提示续期
-    expiring_soon: bool = False
-    # 曾经开通过但已过期：前端显示「已过期·可续期」而不是「未开通」
-    expired: bool = False
 
 
 class EnrollmentCreate(BaseModel):
@@ -248,16 +236,6 @@ class ReminderCreate(BaseModel):
     due_at: datetime
     external_url: str = ""
     course_id: int | None = None
-    # general / medication / oxygen / rehab / vitals / checkup / assessment / vaccine
-    kind: str = Field(
-        default="general",
-        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
-    )
-    drug_name: str = Field(default="", max_length=120)
-    dosage: str = Field(default="", max_length=120)
-    repeat_rule: str = Field(default="none", pattern="^(none|daily|weekly)$")
-    check_type: str = Field(default="", max_length=120)
-    prep_questions: str = Field(default="", max_length=2000)
 
 
 class ReminderUpdate(BaseModel):
@@ -266,15 +244,6 @@ class ReminderUpdate(BaseModel):
     due_at: datetime | None = None
     external_url: str | None = None
     course_id: int | None = None
-    kind: str | None = Field(
-        default=None,
-        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
-    )
-    drug_name: str | None = Field(default=None, max_length=120)
-    dosage: str | None = Field(default=None, max_length=120)
-    repeat_rule: str | None = Field(default=None, pattern="^(none|daily|weekly)$")
-    check_type: str | None = Field(default=None, max_length=120)
-    prep_questions: str | None = Field(default=None, max_length=2000)
 
 
 class ReminderNotifyUpdate(BaseModel):
@@ -307,14 +276,6 @@ class ReminderOut(BaseModel):
     completed_at: datetime | None = None
     can_delete: bool = False
     can_edit: bool = False
-    # 服务化提醒字段
-    kind: str = "general"
-    drug_name: str = ""
-    dosage: str = ""
-    repeat_rule: str = "none"
-    check_type: str = ""
-    prep_questions: str = ""
-    recurring_parent_id: int | None = None
 
 
 class NotificationOut(BaseModel):
@@ -331,8 +292,6 @@ class NotificationOut(BaseModel):
     created_at: datetime
     read_at: datetime | None = None
     read: bool = False
-    # 点击通知时打开的前端路径
-    click_url: str = ""
 
 
 class NotificationListOut(BaseModel):
@@ -341,21 +300,6 @@ class NotificationListOut(BaseModel):
     unread: int = 0
     page: int = 1
     page_size: int = 20
-
-
-class PushSubscriptionKeysIn(BaseModel):
-    p256dh: str = Field(min_length=20, max_length=200)
-    auth: str = Field(min_length=8, max_length=100)
-
-
-class PushSubscriptionIn(BaseModel):
-    endpoint: str = Field(min_length=10, max_length=500)
-    keys: PushSubscriptionKeysIn
-    user_agent: str = Field(default="", max_length=300)
-
-
-class PushUnsubscribeIn(BaseModel):
-    endpoint: str = Field(min_length=10, max_length=500)
 
 
 class ScheduleSlotCreate(BaseModel):
@@ -726,41 +670,6 @@ class CourseProgressOut(BaseModel):
 # ---------- 商城：商品、订单、退款（routers/mall.py）----------
 
 
-# ---------- 板块测验（routers/courses.py）----------
-
-
-class QuizQuestionOut(BaseModel):
-    """下发给前端的题目：不带答案，防作弊。"""
-
-    id: int
-    question: str
-    options: list[str] = Field(default_factory=list)
-
-
-class QuizSubmitIn(BaseModel):
-    # {题目id: 选择的选项下标}
-    answers: dict[int, int] = Field(default_factory=dict)
-
-
-class QuizDetailOut(BaseModel):
-    question_id: int
-    question: str
-    chosen: int
-    answer_index: int
-    correct: bool
-    explanation: str = ""
-    # 错题可回看的课时；题库未关联课时时为空
-    lesson_id: int | None = None
-    lesson_title: str = ""
-
-
-class QuizResultOut(BaseModel):
-    course_id: int
-    score: int
-    total: int
-    details: list[QuizDetailOut] = Field(default_factory=list)
-
-
 class MallIncludedCourseOut(BaseModel):
     id: int
     name: str
@@ -1067,8 +976,6 @@ class MedicationCheckOut(BaseModel):
     lesson_id: int | None = None
     status: str = "completed"
     provider: str = "demo"
-    # oral=口服，inhale=吸入
-    mode: str = "oral"
     steps: list[MedicationStepOut] = Field(default_factory=list)
     needs_retry: bool = False
     message: str = ""
@@ -1086,79 +993,3 @@ class MedicationCheckListOut(BaseModel):
     page_size: int = 20
     retention_days: int = 30
     disclaimer: str = ""
-
-
-# ---------- 症状日记 ----------
-
-
-class SymptomEntryIn(BaseModel):
-    record_date: date | None = None
-    cough: int = Field(default=0, ge=0, le=3)
-    dyspnea: int = Field(default=0, ge=0, le=3)
-    sputum: int = Field(default=0, ge=0, le=3)
-    note: str = Field(default="", max_length=1000)
-
-
-class SymptomEntryOut(BaseModel):
-    id: int
-    record_date: date
-    cough: int = 0
-    dyspnea: int = 0
-    sputum: int = 0
-    note: str = ""
-    total: int = 0
-    warning: bool = False
-    warning_text: str = ""
-    created_at: datetime
-    updated_at: datetime
-
-
-class SymptomDiaryOut(BaseModel):
-    items: list[SymptomEntryOut] = Field(default_factory=list)
-    warning: bool = False
-    warning_text: str = ""
-    disclaimer: str = ""
-
-
-class HealthProfileIn(BaseModel):
-    """个人健康档案写入：全部可选，允许只填一部分后逐步补全。"""
-
-    sex: str = Field(default="", max_length=10)
-    birth_year: str = Field(default="", max_length=10)
-    height_cm: str = Field(default="", max_length=10)
-    weight_kg: str = Field(default="", max_length=10)
-    blood_type: str = Field(default="", max_length=10)
-
-    diagnosis: str = Field(default="", max_length=120)
-    diagnosed_at: str = Field(default="", max_length=20)
-    copd_grade: str = Field(default="", max_length=20)
-    fev1_percent: str = Field(default="", max_length=10)
-    fev1_fvc: str = Field(default="", max_length=10)
-    oxygen_target: str = Field(default="", max_length=30)
-
-    current_meds: str = Field(default="", max_length=4000)
-    allergies: str = Field(default="", max_length=2000)
-    past_history: str = Field(default="", max_length=4000)
-
-    emergency_name: str = Field(default="", max_length=60)
-    emergency_relation: str = Field(default="", max_length=30)
-    emergency_phone: str = Field(default="", max_length=40)
-
-    doctor_name: str = Field(default="", max_length=60)
-    doctor_hospital: str = Field(default="", max_length=120)
-    doctor_dept: str = Field(default="", max_length=60)
-    doctor_phone: str = Field(default="", max_length=40)
-
-    notes: str = Field(default="", max_length=2000)
-
-
-class HealthProfileOut(HealthProfileIn):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int = 0
-    full_name: str = ""
-    username: str = ""
-    updated_at: datetime | None = None
-    # 档案完整度（0-100）与缺失项提示，前端用来引导补全
-    completeness: int = 0
-    missing: list[str] = Field(default_factory=list)

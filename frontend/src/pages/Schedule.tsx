@@ -5,6 +5,13 @@ import { useAuth } from '../auth'
 import type { Course, ScheduleSlot } from '../types'
 import { weekdayLabel } from '../utils'
 
+/** 课程分类标签：整包课 / 单课 / 入门课 */
+const CAT_LABEL: Record<string, string> = {
+  intro: '入门课',
+  single: '单课',
+  bundle: '整包课',
+}
+
 export default function Schedule() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -18,6 +25,8 @@ export default function Schedule() {
   )
   const [showForm, setShowForm] = useState(false)
   const [filterCourseId, setFilterCourseId] = useState(filterFromUrl)
+  // 课程分类筛选：全部 / 入门课 / 单课 / 整包课
+  const [cat, setCat] = useState<'all' | 'intro' | 'single' | 'bundle'>('all')
 
   const canManageSlot = user?.role === 'admin'
 
@@ -57,9 +66,17 @@ export default function Schedule() {
   }, [filterFromUrl])
 
   const visibleSlots = useMemo(() => {
-    if (!filterCourseId) return slots
-    return slots.filter((s) => String(s.course_id) === filterCourseId)
-  }, [slots, filterCourseId])
+    let list = slots
+    if (cat !== 'all') {
+      list = list.filter(
+        (s) => (courseMap.get(s.course_id)?.course_type ?? 'single') === cat,
+      )
+    }
+    if (filterCourseId) {
+      list = list.filter((s) => String(s.course_id) === filterCourseId)
+    }
+    return list
+  }, [slots, filterCourseId, cat, courseMap])
 
   const counts = useMemo(() => {
     const map = Array.from({ length: 7 }, () => 0)
@@ -122,6 +139,26 @@ export default function Schedule() {
             {showForm ? '取消' : '加课'}
           </button>
         )}
+      </div>
+
+      <div className="sched-cats">
+        {(
+          [
+            ['all', '全部'],
+            ['intro', '入门课'],
+            ['single', '单课'],
+            ['bundle', '整包课'],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            className={`sched-cat${cat === k ? ' active' : ''}`}
+            onClick={() => setCat(k)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {courses.length > 0 && (
@@ -219,6 +256,11 @@ export default function Schedule() {
               <div>
                 <Link to={`/courses?id=${s.course_id}`} className="slot-course-link">
                   <strong>{s.course_name}</strong>
+                  <span
+                    className={`slot-cat cat-${course?.course_type ?? 'single'}`}
+                  >
+                    {CAT_LABEL[course?.course_type ?? 'single'] ?? '单课'}
+                  </span>
                 </Link>
                 <p className="meta" style={{ margin: '4px 0 0' }}>
                   {s.location || '地点待定'}

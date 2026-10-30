@@ -111,35 +111,10 @@ export default function ServiceShop() {
         </div>
       </div>
 
-      <section className="mall-hero hero-pattern">
-        <div className="hero-pattern-deco" aria-hidden="true" />
-        <h2>医护跟进，随时在线</h2>
-        <p>
-          {isAdmin
-            ? '管理员模式下所有服务免费开放，可直接查看服务详情。'
-            : '远程随访、康复指导、用药托管等专业服务按需选购，按次或按周期灵活开通。'}
-        </p>
-        <div className="mall-hero-stats">
-          <div>
-            <strong>{items.length > 0 ? items.length : '—'}</strong>
-            <span>在售服务</span>
-          </div>
-          <div>
-            <strong>{new Set(items.map((s) => s.category)).size || '—'}</strong>
-            <span>服务类型</span>
-          </div>
-          <div>
-            <strong>医护</strong>
-            <span>团队支持</span>
-          </div>
-        </div>
-      </section>
-
       {items.length === 0 ? (
         <p className="muted">暂无在售服务</p>
       ) : (
         <>
-          <div className="mall-section-label">选择服务</div>
           <div className="course-card-grid">
             {items.map((s) => (
               <button
@@ -167,56 +142,49 @@ export default function ServiceShop() {
           </div>
 
           {active && (
-            <>
-              <div className="mall-section-label">服务详情</div>
-              <section className="item-card course-detail">
-                <div className="course-detail-cover">
-                  <Cover src={active.cover_url} alt={active.name} />
-                </div>
-                <h2>{active.name}</h2>
-                <p className={`course-price-lg${isAdmin ? ' is-free' : ''}`}>
-                  {priceText(active.price, isAdmin, PRICE_FALLBACK)}
+            <section className="item-card course-detail">
+              <div className="course-detail-cover">
+                <Cover src={active.cover_url} alt={active.name} />
+              </div>
+              <h2>{active.name}</h2>
+              <p className={`course-price-lg${isAdmin ? ' is-free' : ''}`}>
+                {priceText(active.price, isAdmin, PRICE_FALLBACK)}
+              </p>
+              <p className="meta">
+                {active.category}
+                {active.unit_label ? ` · ${active.unit_label}` : ''}
+                {isAdmin ? ' · 免费开放' : active.owned ? ' · 已开通' : ' · 未开通'}
+              </p>
+              {active.description ? (
+                <p style={{ margin: '10px 0 0' }}>{active.description}</p>
+              ) : (
+                <p className="muted" style={{ margin: '10px 0 0' }}>
+                  暂无简介
                 </p>
-                <p className="meta">
-                  {active.category}
-                  {active.unit_label ? ` · ${active.unit_label}` : ''}
-                  {isAdmin ? ' · 免费开放' : active.owned ? ' · 已开通' : ' · 未开通'}
-                </p>
-                {active.description ? (
-                  <p style={{ margin: '10px 0 0' }}>{active.description}</p>
-                ) : (
-                  <p className="muted" style={{ margin: '10px 0 0' }}>
-                    暂无简介
-                  </p>
-                )}
+              )}
 
-                {active.owned || isAdmin ? (
-                  <p className="ok-tip" style={{ marginTop: 12 }}>
-                    {isAdmin ? '管理员免费开放，无需购买' : '该服务已开通'}
-                  </p>
-                ) : (
-                  <div className="course-buy-box">
-                    <button
-                      type="button"
-                      className="btn primary block"
-                      disabled={buying}
-                      onClick={() => void onPurchase()}
-                    >
-                      {buying ? '支付中…' : `支付 ${formatPrice(active.price, PRICE_FALLBACK)} 开通`}
-                    </button>
-                    <p className="meta">模拟支付：确认后立即开通，后续可接真实支付通道</p>
-                  </div>
-                )}
-                {payTip ? <p className="ok-tip">{payTip}</p> : null}
-              </section>
-            </>
+              {active.owned || isAdmin ? (
+                <p className="ok-tip" style={{ marginTop: 12 }}>
+                  {isAdmin ? '管理员免费开放，无需购买' : '该服务已开通'}
+                </p>
+              ) : (
+                <div className="course-buy-box">
+                  <button
+                    type="button"
+                    className="btn primary block"
+                    disabled={buying}
+                    onClick={() => void onPurchase()}
+                  >
+                    {buying ? '支付中…' : `支付 ${formatPrice(active.price, PRICE_FALLBACK)} 开通`}
+                  </button>
+                  <p className="meta">模拟支付：确认后立即开通，后续可接真实支付通道</p>
+                </div>
+              )}
+              {payTip ? <p className="ok-tip">{payTip}</p> : null}
+            </section>
           )}
         </>
       )}
-
-      <p className="mall-footnote">
-        服务由演示医护团队提供，购买后可在「监督」板块查看随访安排；支付流程为演示环境模拟，不产生真实扣费。
-      </p>
     </div>
   )
 }

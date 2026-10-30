@@ -96,12 +96,7 @@ def _parse_result(payload) -> tuple[list[dict], bool, str]:
     return steps, bool(payload.get("needs_retry")), message
 
 
-def _http_detect(
-    image: bytes,
-    content_type: str,
-    lesson_id: int | None,
-    mode: str = "oral",
-) -> tuple[list[dict], bool, str]:
+def _http_detect(image: bytes, content_type: str, lesson_id: int | None) -> tuple[list[dict], bool, str]:
     url = os.getenv("AI_DETECTOR_URL", "").strip()
     token = os.getenv("AI_DETECTOR_TOKEN", "").strip()
     if not url:
@@ -120,7 +115,6 @@ def _http_detect(
         headers["Authorization"] = f"Bearer {token}"
     if lesson_id is not None:
         headers["X-Lesson-Id"] = str(lesson_id)
-    headers["X-Medication-Mode"] = mode
     request = urllib.request.Request(url, data=image, headers=headers, method="POST")
 
     payload = None
@@ -150,36 +144,17 @@ def _http_detect(
     return _parse_result(payload)
 
 
-DEMO_STEPS = {
-    "oral": [
-        {"name": "核对药名与剂量", "done": True},
-        {"name": "将药送入口中", "done": True},
-        {"name": "完成吞咽动作", "done": False},
-        {"name": "用药后留在画面内", "done": True},
-    ],
-    "inhale": [
-        {"name": "摇匀吸入装置", "done": True},
-        {"name": "先充分呼气", "done": True},
-        {"name": "含紧吸嘴", "done": True},
-        {"name": "深吸气", "done": False},
-        {"name": "吸完后屏气", "done": False},
-    ],
-}
-
-
-def detect(
-    image: bytes,
-    content_type: str,
-    lesson_id: int | None = None,
-    mode: str = "oral",
-) -> tuple[list[dict], bool, str, str]:
+def detect(image: bytes, content_type: str, lesson_id: int | None = None) -> tuple[list[dict], bool, str, str]:
     """返回 (步骤摘要, 是否需要重做, 提示, provider)。"""
     url = os.getenv("AI_DETECTOR_URL", "").strip()
     if not url:
-        steps = [dict(item) for item in DEMO_STEPS.get(mode, DEMO_STEPS["oral"])]
-        needs_retry = any(not item["done"] for item in steps)
-        return steps, needs_retry, DEMO_MESSAGE, "demo"
-    steps, needs_retry, message = _http_detect(image, content_type, lesson_id, mode)
+        steps = [
+            {"name": "核对药名", "done": True},
+            {"name": "核对剂量与时间", "done": True},
+            {"name": "完成本次用药动作", "done": False},
+        ]
+        return steps, False, DEMO_MESSAGE, "demo"
+    steps, needs_retry, message = _http_detect(image, content_type, lesson_id)
     return steps, needs_retry, message, "http"
 
 

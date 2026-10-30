@@ -4,9 +4,6 @@
 这里保留前端正在使用的接口形状，并补充课时与进度接口。
 """
 
-import json
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -20,8 +17,6 @@ from ..models import (
     Enrollment,
     Lesson,
     LessonProgress,
-    QuizAttempt,
-    QuizQuestion,
     User,
 )
 from ..schemas import (
@@ -38,34 +33,9 @@ from ..schemas import (
     LessonProgressIn,
     LessonProgressOut,
     LessonUpdate,
-    QuizDetailOut,
-    QuizQuestionOut,
-    QuizResultOut,
-    QuizSubmitIn,
 )
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
-
-# 课后小自测：按课时标题返回题目，前端即时判分
-lesson_quiz_router = APIRouter(prefix="/api/lesson-quiz", tags=["courses"])
-
-
-@lesson_quiz_router.get("")
-def lesson_quiz_map(_: User = Depends(get_current_user)):
-    """每节课后的小自测题（一节一题，即时判分，不做成绩记录）。"""
-    from ..lesson_quiz import LESSON_QUIZ
-
-    return {
-        "items": {
-            title: {
-                "question": row[0],
-                "options": list(row[1]),
-                "answer": int(row[2]),
-                "explanation": row[3],
-            }
-            for title, row in LESSON_QUIZ.items()
-        }
-    }
 
 
 def enrolled_ids(db: Session, user: User) -> set[int]:
@@ -77,14 +47,8 @@ def to_out(
     c: Course,
     owned: set[int] | None = None,
     expires_at: object | None = None,
-    expired: bool = False,
 ) -> CourseOut:
     owned_flag = True if owned is None else c.id in owned
-    left = (
-        mall.days_left(expires_at)
-        if owned_flag and isinstance(expires_at, datetime)
-        else None
-    )
     return CourseOut(
         id=c.id,
         name=c.name,
@@ -105,15 +69,8 @@ def to_out(
         sort_order=int(c.sort_order or 0),
         valid_days=int(c.valid_days or 0),
         trial_lesson_count=int(c.trial_lesson_count or 0),
-        category=c.category or "",
-        audience=c.audience or "",
         lesson_count=len(mall.course_lessons(db, c)),
         expires_at=expires_at,
-        days_left=left,
-        expiring_soon=bool(
-            left is not None and 0 < left <= mall.EXPIRING_SOON_DAYS
-        ),
-        expired=bool(expired and not owned_flag),
     )
 
 
@@ -121,21 +78,12 @@ def with_access(
     db: Session, user: User, courses: list[Course]
 ) -> list[CourseOut]:
     owned = mall.accessible_course_ids(db, user)
-    expiry_map = mall.enrollment_expiry_map(db, user.id)
     result: list[CourseOut] = []
     for c in courses:
-        info = expiry_map.get(c.id) or {}
-        is_owned = c.id in owned
-        expiry = info.get("expires_at") if is_owned else None
-        result.append(
-            to_out(
-                db,
-                c,
-                owned,
-                expiry,
-                expired=bool(info.get("expired")),
-            )
-        )
+        expiry = None
+        if c.id in owned:
+            _, expiry, _ = mall.course_access_info(db, user, c)
+        result.append(to_out(db, c, owned, expiry))
     return result
 
 
@@ -182,8 +130,6 @@ def create_course(
         sort_order=int(body.sort_order or 0),
         valid_days=int(body.valid_days or 0),
         trial_lesson_count=int(body.trial_lesson_count or 0),
-        category=(body.category or "").strip(),
-        audience=(body.audience or "").strip(),
     )
     db.add(course)
     db.commit()
@@ -208,7 +154,7 @@ def update_course(
     for field, value in data.items():
         if field == "cover_url" and value is not None:
             value = value.strip()
-        if field in ("path_label", "tagline", "category", "audience") and value is not None:
+        if field in ("path_label", "tagline") and value is not None:
             value = value.strip()
         setattr(course, field, value)
     db.commit()
@@ -515,95 +461,6 @@ def get_course_progress(
     )
 
 
-# ---------- 板块测验 ----------
-
-
-@router.get("/{course_id}/quiz", response_model=list[QuizQuestionOut])
-def get_quiz(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """获取某门课的测验题（不返回答案）。"""
-    course = db.get(Course, course_id)
-    if not course:
-        raise HTTPException(status_code=404, detail="课程不存在")
-    questions = (
-        db.query(QuizQuestion)
-        .filter(QuizQuestion.course_id == course_id)
-        .order_by(QuizQuestion.sort_order, QuizQuestion.id)
-        .all()
-    )
-    return [
-        QuizQuestionOut(
-            id=q.id,
-            question=q.question,
-            options=json.loads(q.options or "[]"),
-        )
-        for q in questions
-    ]
-
-
-@router.post("/{course_id}/quiz", response_model=QuizResultOut)
-def submit_quiz(
-    course_id: int,
-    payload: QuizSubmitIn,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """提交答案：后端判分、返回对错与解析，并保存一次作答记录。"""
-    course = db.get(Course, course_id)
-    if not course:
-        raise HTTPException(status_code=404, detail="课程不存在")
-    questions = (
-        db.query(QuizQuestion)
-        .filter(QuizQuestion.course_id == course_id)
-        .order_by(QuizQuestion.sort_order, QuizQuestion.id)
-        .all()
-    )
-    if not questions:
-        raise HTTPException(status_code=404, detail="该课程暂未配置测验题")
-
-    details: list[QuizDetailOut] = []
-    answers_record: list[dict] = []
-    score = 0
-    for q in questions:
-        chosen = payload.answers.get(q.id, -1)
-        correct = chosen == q.answer_index
-        if correct:
-            score += 1
-        lesson = db.get(Lesson, q.lesson_id) if q.lesson_id else None
-        details.append(
-            QuizDetailOut(
-                question_id=q.id,
-                question=q.question,
-                chosen=chosen,
-                answer_index=q.answer_index,
-                correct=correct,
-                explanation=q.explanation or "",
-                lesson_id=q.lesson_id,
-                lesson_title=lesson.title if lesson else "",
-            )
-        )
-        answers_record.append(
-            {"question_id": q.id, "chosen": chosen, "correct": correct}
-        )
-
-    db.add(
-        QuizAttempt(
-            user_id=user.id,
-            course_id=course_id,
-            score=score,
-            total=len(questions),
-            answers_json=json.dumps(answers_record, ensure_ascii=False),
-        )
-    )
-    db.commit()
-    return QuizResultOut(
-        course_id=course_id, score=score, total=len(questions), details=details
-    )
-
-
 # ---------- 兼容旧前端的购买接口 ----------
 
 
@@ -642,8 +499,24 @@ def enroll(
     return {"ok": True}
 
 
-def purchase_out(db: Session, user: User, order: CoursePurchase) -> CoursePurchaseOut:
-    """订单 → 出参（购课与续期共用）。"""
+@router.post("/{course_id}/purchase", response_model=CoursePurchaseOut)
+def purchase_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """兼容旧前端的「确认即支付」：内部走完整订单 → 模拟支付。"""
+    try:
+        order = mall.create_course_order(
+            db, user, course_id, quantity=1, channel="mock"
+        )
+        if order.status == "pending":
+            order = mall.pay_course_order(
+                db, order, channel="mock", transaction_id="LEGACY"
+            )
+    except mall.MallError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
     course = db.get(Course, order.course_id)
     owned = enrolled_ids(db, user)
     return CoursePurchaseOut(
@@ -676,55 +549,6 @@ def purchase_out(db: Session, user: User, order: CoursePurchase) -> CoursePurcha
         refunded_at=order.refunded_at,
         refund_reason=order.refund_reason or "",
     )
-
-
-@router.post("/{course_id}/purchase", response_model=CoursePurchaseOut)
-def purchase_course(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """兼容旧前端的「确认即支付」：内部走完整订单 → 模拟支付。"""
-    try:
-        order = mall.create_course_order(
-            db, user, course_id, quantity=1, channel="mock"
-        )
-        if order.status == "pending":
-            order = mall.pay_course_order(
-                db, order, channel="mock", transaction_id="LEGACY"
-            )
-    except mall.MallError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-    return purchase_out(db, user, order)
-
-
-@router.post("/{course_id}/renew", response_model=CoursePurchaseOut)
-def renew_course(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """续期：在剩余有效期上叠加一个售卖周期（默认 730 天 = 2 年）。
-
-    仅在「已开通且按有效期售卖（source=purchase）」时可用；
-    长期有效（管理员开通/演示）与整包带入的访问权不支持续期。
-    """
-    try:
-        order = mall.create_course_order(
-            db, user, course_id, quantity=1, channel="mock", renew=True
-        )
-        if order.status == "pending":
-            order = mall.pay_course_order(
-                db, order, channel="mock", transaction_id="RENEW"
-            )
-    except mall.MallError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
-
-    course = db.get(Course, course_id)
-    if course is not None:
-        db.refresh(course)
-    return purchase_out(db, user, order)
-
 
 
 @router.get("/purchases/mine", response_model=list[CoursePurchaseOut])

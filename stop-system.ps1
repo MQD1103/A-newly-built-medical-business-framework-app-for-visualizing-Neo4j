@@ -1,7 +1,7 @@
-﻿$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$Ports = @(8000, 5173)
+$Ports = @(8001, 5174)
 
 function Write-Step([string]$Message, [string]$Color = 'Cyan') {
   Write-Host "[关闭] $Message" -ForegroundColor $Color
@@ -75,7 +75,7 @@ foreach ($port in $Ports) {
 }
 
 if ($stillBusy.Count -eq 0) {
-  Write-Host '[成功] 端口 8000 / 5173 已释放。' -ForegroundColor Green
+  Write-Host '[成功] 端口 8001 / 5174 已释放。' -ForegroundColor Green
   exit 0
 }
 
