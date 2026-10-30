@@ -3978,3 +3978,73 @@ html.dark .impersonate-exit {
 }
 
 html.dark img { filter: brightness(0.92); }
+/* ===== 黑夜模式 · 全站协调（参考首页渐变暗色） ===== */
+
+/* 页面横幅：改深色渐变 */
+html.dark .mall-hero { background: linear-gradient(120deg, #0f3a4d 0%, #14655c 50%, #274f86 100%); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
+html.dark .svc-hero { background: linear-gradient(120deg, #1d3a6b, #2a5298 55%, #1f6e5c); }
+html.dark .screen-head.soft { background: linear-gradient(160deg, #1c2c42, #141d2b 60%, transparent); }
+html.dark .mall-promo { background: linear-gradient(90deg, #3a2a1c, #3a2222); }
+html.dark .impersonate-bar { background: linear-gradient(90deg, #3f3018, #45341f); }
+html.dark .mall-hero-badge, html.dark .mall-hero-stats span { background: rgba(0, 0, 0, 0.28); }
+
+/* 课程页：卡片/行/筛选统一暗色，消除黑一块白一块 */
+html.dark .course-card,
+html.dark .course-sell-row,
+html.dark .lesson-row { background: rgba(27, 38, 53, 0.9); border-color: rgba(91, 163, 245, 0.3); }
+html.dark .course-sell-row.active,
+html.dark .lesson-row.active { background: rgba(59, 134, 224, 0.18); }
+html.dark .course-chip,
+html.dark .link-tab { background: #22303f; color: #8fb8ec; border-color: rgba(91, 163, 245, 0.4); }
+html.dark .course-search,
+html.dark .course-sort { background: #1b2635; border-color: rgba(91, 163, 245, 0.3); }
+html.dark .course-sort { color: #a8c4e8; }
+html.dark .course-quick-links a { color: #8fb8ec; }
+html.dark .lesson-index { background: rgba(91, 163, 245, 0.18); color: #8fb8ec; }
+html.dark option { background: #1b2635; color: var(--ink); }
+
+/* 商城：卡片/工具栏/弹窗/券 */
+html.dark .mall-card,
+html.dark .mall-modal,
+html.dark .mall-search,
+html.dark .mall-search-clear,
+html.dark .inline-filter select { background: #1b2635; }
+html.dark .mall-coupon { background: linear-gradient(90deg, #38291d, #2c2118); }
+html.dark .mall-coupon-claim { background: linear-gradient(135deg, #b35a20, #c93a3e); }
+
+/* 服务页卡片与图标底 */
+html.dark .svc-card,
+html.dark .hub-card,
+html.dark .neo-side,
+html.dark .neo-info-card,
+html.dark .neo-bar,
+html.dark .neo-rem-countdown,
+html.dark .neo-seek-banner { background: rgba(27, 38, 53, 0.92); }
+html.dark .svc-tone-a .svc-card-icon { background: linear-gradient(135deg, #1d3a6b, #274f86); }
+html.dark .svc-tone-b .svc-card-icon { background: linear-gradient(135deg, #4a3518, #6b4423); }
+html.dark .svc-tone-c .svc-card-icon { background: linear-gradient(135deg, #144d3f, #1f6e5c); }
+
+/* 社区/聊天/其他残留白底 */
+html.dark .community-photo-add { background: rgba(27, 38, 53, 0.7); color: #8fb8ec; }
+html.dark .chat-compose { background: linear-gradient(180deg, rgba(20, 29, 43, 0), #141d2b 45%); }
+html.dark .chat-compose input,
+html.dark .comment-compose input { background: #131c29; color: var(--ink); }
+html.dark .lightbox-close,
+html.dark .lightbox-nav { background: rgba(27, 38, 53, 0.9); }
+html.dark .demo-box,
+html.dark .demo-box.on-gradient,
+html.dark .neo-chip.ghost,
+html.dark .neo-key { background: #22303f; color: var(--ink); }
+/* ===== 黑夜模式 · 收尾补齐 ===== */
+html.dark .svc-stat,
+html.dark .svc-quick,
+html.dark .svc-checkin { background: #1b2635; }
+html.dark .community-search { background: #1b2635; }
+html.dark .comment-compose input { background: #131c29; }
+html.dark .community-feed .community-post-head strong { color: #a8c4e8; }
+html.dark .c-act, html.dark .community-actions .c-act { background: rgba(91, 163, 245, 0.2); color: #8fb8ec; }
+html.dark .badge.soft { background: rgba(91, 163, 245, 0.2); color: #8fb8ec; }
+html.dark .community-avatar.fallback { background: #22303f; color: #8fb8ec; }
+html.dark .community-original { background: rgba(27, 38, 53, 0.7); }
+html.dark .svc-quick input { background: #131c29; }
+html.dark .topic-chip, html.dark .community-topics button { background: #22303f; color: #8fb8ec; border-color: rgba(91, 163, 245, 0.4); }
