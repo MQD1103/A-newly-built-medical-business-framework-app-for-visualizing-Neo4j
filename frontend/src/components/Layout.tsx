@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
 
@@ -12,6 +13,12 @@ const tabs = [
 export default function Layout() {
   const { pathname } = useLocation()
   const { user, impersonating, stopImpersonating } = useAuth()
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
   const hideTab =
     pathname.startsWith('/notices/') ||
     pathname.startsWith('/manage') ||
@@ -36,6 +43,14 @@ export default function Layout() {
   return (
     <div className="phone-stage">
       <div className={`app-frame${hideTab ? ' no-tab' : ''}`}>
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={dark ? '切换到日间模式' : '切换到黑夜模式'}
+          onClick={() => setDark((v) => !v)}
+        >
+          {dark ? '☀️' : '🌙'}
+        </button>
         {/* 身份切换横幅：与 hideTab 无关，任何页面都要能看到并退出 */}
         {impersonating && (
           <div className="impersonate-bar">

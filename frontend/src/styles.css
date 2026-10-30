@@ -3903,3 +3903,78 @@ textarea:focus {
 .svc-checkin-text { margin:0; font-size:.85rem; }
 .svc-checkin-text strong { color:#2b8a6b; }
 .svc-checkin-sub { margin:2px 0 0; font-size:.7rem; color:#8fa3bd; }
+/* ===== 黑夜模式 ===== */
+.app-frame { position: relative; }
+
+.theme-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 30;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0.88;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.theme-toggle:active { transform: scale(0.92); }
+
+html.dark {
+  --blue-soft: #1c2c42;
+  --blue-wash: #141d2b;
+  --ink: #e8eef7;
+  --muted: #93a3b8;
+  --line: #2b3a4e;
+  --panel: #1b2635;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+html.dark body {
+  background:
+    radial-gradient(800px 400px at 20% 0%, #16233a 0%, transparent 55%),
+    radial-gradient(700px 360px at 100% 10%, #12202f 0%, transparent 50%),
+    #0b1017;
+}
+
+html.dark .app-frame {
+  border-color: rgba(91, 163, 245, 0.18);
+  box-shadow: var(--shadow), 0 0 0 8px rgba(10, 16, 24, 0.6);
+}
+
+html.dark .tabbar { background: rgba(24, 33, 46, 0.94); }
+
+html.dark .btn { background: #263548; }
+html.dark .btn.primary {
+  background: linear-gradient(180deg, var(--blue), var(--blue-deep));
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background: #131c29;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+html.dark .login-white-card,
+html.dark .repost-sheet,
+html.dark .lesson-now,
+html.dark .day-chip,
+html.dark .slot-item,
+html.dark .event-row,
+html.dark .neo-drill-mark,
+html.dark .impersonate-exit {
+  background: #1b2635;
+  color: var(--ink);
+}
+
+html.dark img { filter: brightness(0.92); }
