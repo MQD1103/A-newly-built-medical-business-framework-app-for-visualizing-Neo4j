@@ -1,6 +1,6 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
-import HelperOrb from './HelperOrb'
 
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
@@ -13,6 +13,12 @@ const tabs = [
 export default function Layout() {
   const { pathname } = useLocation()
   const { user, impersonating, stopImpersonating } = useAuth()
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
   const hideTab =
     pathname.startsWith('/notices/') ||
     pathname.startsWith('/manage') ||
@@ -26,24 +32,25 @@ export default function Layout() {
     pathname.startsWith('/service-shop') ||
     pathname.startsWith('/supervision') ||
     pathname.startsWith('/materials') ||
-    pathname.startsWith('/scores') ||
-    pathname.startsWith('/family') ||
-    pathname.startsWith('/orders')
+    pathname.startsWith('/scores')
 
   const servicesActive =
     pathname.startsWith('/services') ||
     pathname.startsWith('/schedule') ||
     pathname.startsWith('/reminders') ||
-    pathname.startsWith('/hospital') ||
-    pathname.startsWith('/ai-check') ||
-    pathname.startsWith('/symptom-diary') ||
-    pathname.startsWith('/vitals') ||
-    pathname.startsWith('/notifications') ||
     pathname.startsWith('/linked')
 
   return (
     <div className="phone-stage">
       <div className={`app-frame${hideTab ? ' no-tab' : ''}`}>
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={dark ? '切换到日间模式' : '切换到黑夜模式'}
+          onClick={() => setDark((v) => !v)}
+        >
+          {dark ? '☀️' : '🌙'}
+        </button>
         {/* 身份切换横幅：与 hideTab 无关，任何页面都要能看到并退出 */}
         {impersonating && (
           <div className="impersonate-bar">
@@ -62,8 +69,6 @@ export default function Layout() {
         <main className="app-main">
           <Outlet />
         </main>
-        {/* 首页小助手：球体入口，输入文字即可跳到对应功能 */}
-        {pathname === '/' && <HelperOrb />}
         {!hideTab && (
           <nav className="tabbar" aria-label="主导航">
             {tabs.map((t) => (
@@ -75,12 +80,6 @@ export default function Layout() {
                   let on = isActive
                   if (t.to === '/mall') on = mallActive
                   if (t.to === '/services') on = servicesActive
-                  if (t.to === '/me') {
-                    on =
-                      isActive ||
-                      pathname.startsWith('/health-profile') ||
-                      pathname.startsWith('/profile')
-                  }
                   return `tab-item${on ? ' active' : ''}`
                 }}
               >

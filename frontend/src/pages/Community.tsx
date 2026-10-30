@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, apiUpload } from '../api'
 import { useAuth } from '../auth'
@@ -54,6 +54,8 @@ export default function Community() {
   const [actionError, setActionError] = useState('')
   const [tip, setTip] = useState('')
   const [scope, setScope] = useState<'all' | 'friends'>('all')
+  // 动态搜索 + 话题筛选（前端本地过滤）
+  const [search, setSearch] = useState('')
   const [counts, setCounts] = useState<FriendSummary>({
     pending_requests: 0,
     unread_messages: 0,
@@ -323,6 +325,18 @@ export default function Community() {
     )
   }
 
+  const visibleItems = useMemo(() => {
+    const kw = search.trim().toLowerCase()
+    if (!kw) return items
+    return items.filter(
+      (p) =>
+        (p.content || '').toLowerCase().includes(kw) ||
+        (p.author_name || '').toLowerCase().includes(kw) ||
+        (p.original?.content || '').toLowerCase().includes(kw) ||
+        (p.original?.author_name || '').toLowerCase().includes(kw),
+    )
+  }, [items, search])
+
   if (error) {
     return (
       <div className="screen stack-gap">
@@ -339,7 +353,7 @@ export default function Community() {
       <div className="page-title">
         <div>
           <h1>社区</h1>
-          <p className="sub">小医社区 · {user?.full_name}</p>
+          <p className="sub">小医社区 · {user?.full_name} · 分享康复点滴</p>
         </div>
         <div className="page-title-actions">
           <button
@@ -363,7 +377,33 @@ export default function Community() {
         </div>
       </div>
 
-      <div className="link-tabs two">
+      <div className="community-tools">
+        <div className="community-search">
+          <span className="community-search-icon">🔍</span>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索动态 / 作者 / 话题…"
+          />
+          {search && (
+            <button type="button" className="community-search-clear" onClick={() => setSearch('')} aria-label="清空">×</button>
+          )}
+        </div>
+        <div className="community-topics">
+          {['康复日记', '用药交流', '饮食分享', '心情树洞'].map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`community-topic${search === '#' + t ? ' active' : ''}`}
+              onClick={() => setSearch(search === '#' + t ? '' : '#' + t)}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="link-tabs two community-tabs">
         {(
           [
             ['all', '全部'],
@@ -458,7 +498,7 @@ export default function Community() {
       )}
 
       <ul className="list-card community-feed">
-        {items.map((p) => (
+        {visibleItems.map((p) => (
           <li key={p.id}>
             <div className="community-post-head">
               <div className="community-author">
@@ -516,14 +556,14 @@ export default function Community() {
                 className={`c-act${p.liked_by_me ? ' on' : ''}`}
                 onClick={() => void onToggleLike(p)}
               >
-                {p.liked_by_me ? '已赞' : '点赞'} {p.like_count || 0}
+                👍 {p.liked_by_me ? '已赞' : '点赞'} {p.like_count || 0}
               </button>
               <button
                 type="button"
                 className={`c-act${openComments === p.id ? ' on' : ''}`}
                 onClick={() => void toggleComments(p.id)}
               >
-                评论 {p.comment_count || 0}
+                💬 评论 {p.comment_count || 0}
               </button>
               <button
                 type="button"
@@ -533,7 +573,7 @@ export default function Community() {
                   setRepostText('')
                 }}
               >
-                转发 {p.share_count || 0}
+                🔁 转发 {p.share_count || 0}
               </button>
               {p.can_delete && (
                 <button type="button" className="linkish" onClick={() => void onDelete(p.id)}>
@@ -594,11 +634,13 @@ export default function Community() {
           </li>
         ))}
       </ul>
-      {items.length === 0 && (
+      {visibleItems.length === 0 && (
         <p className="muted">
-          {scope === 'friends'
-            ? '好友暂无动态，切到「全部」看看，或先去加几个好友'
-            : '还没有动态，点击右上角 + 发一条吧'}
+          {search
+            ? `没有找到「${search}」相关的动态`
+            : scope === 'friends'
+              ? '好友暂无动态，切到「全部」看看，或先去加几个好友'
+              : '还没有动态，点击右上角 + 发一条吧，带上 #话题# 更容易被看到'}
         </p>
       )}
 
