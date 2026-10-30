@@ -74,7 +74,3 @@ export function friendActionLabel(state: string, hasActed: boolean): string | nu
   if (state === 'pending_out') return hasActed ? '已发送申请' : '待验证'
   return hasActed ? '已发送申请' : '加好友'
 }
-
-/** 源码仓库地址：页面上的「GitHub 仓库」入口统一引用这里，改地址只改一处 */
-export const REPO_URL =
-  'https://github.com/MQD1103/A-newly-built-medical-business-framework-app-for-visualizing-Neo4j'

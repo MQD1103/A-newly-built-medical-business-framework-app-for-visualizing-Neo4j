@@ -15,17 +15,13 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import push_service
 from .database import SessionLocal
 from .models import (
     CourseBundleItem,
     Enrollment,
-    Lesson,
-    LessonProgress,
     Notification,
     Reminder,
     ReminderCompletion,
@@ -218,159 +214,12 @@ def sync_due_notifications(db: Session, current: datetime | None = None) -> int:
     return total
 
 
-# ---------------- 学习召回 ----------------
-#
-# 「连续 N 天未学习」的召回推送：
-# - 最后学习时间取课时进度里最新的 updated_at（拖动进度条也算在学习）；
-#   从未学过则回退到开通时间 granted_at。
-# - 达到阈值后生成一条 source=system 的系统提醒，复用现有
-#   「提醒 → 站内通知 → 手机推送」链路，点击直达课程页。
-# - 课程全部学完的不召回；同一用户同一课程在冷却期（默认 7 天）内不重复打扰。
-# - LEARNING_RECALL_DAYS 控制阈值（默认 3，设为 0 整体关闭）；
-#   LEARNING_RECALL_COOLDOWN_DAYS 控制冷却期（默认 7）。
-
-
-def recall_threshold() -> int:
-    try:
-        return int(os.getenv("LEARNING_RECALL_DAYS", "3") or "3")
-    except ValueError:
-        return 3
-
-
-def recall_cooldown_days() -> int:
-    try:
-        return int(os.getenv("LEARNING_RECALL_COOLDOWN_DAYS", "7") or "7")
-    except ValueError:
-        return 7
-
-
-def sync_learning_recall(db: Session, current: datetime | None = None) -> int:
-    """扫描全部在学记录，为连续 N 天未学习的用户生成召回提醒与通知。
-
-    返回新建的站内通知条数；只 flush 不 commit，由调用方决定事务。
-    """
-    current = current or now()
-    threshold = recall_threshold()
-    if threshold <= 0:
-        return 0
-    cooldown = timedelta(days=max(recall_cooldown_days(), 1))
-
-    enrollments = (
-        db.query(Enrollment)
-        .filter(
-            (Enrollment.expires_at.is_(None))
-            | (Enrollment.expires_at > current)
-        )
-        .all()
-    )
-    created = 0
-    for enrollment in enrollments:
-        course = enrollment.course
-        if course is None:
-            continue
-        lesson_ids = [
-            int(row[0])
-            for row in db.query(Lesson.id)
-            .filter(Lesson.course_id == course.id)
-            .all()
-        ]
-        if not lesson_ids:
-            continue
-
-        last_study = (
-            db.query(func.max(LessonProgress.updated_at))
-            .filter(
-                LessonProgress.user_id == enrollment.student_id,
-                LessonProgress.course_id == course.id,
-            )
-            .scalar()
-        )
-        baseline = last_study or enrollment.granted_at or current
-        if baseline >= current:
-            continue
-        idle_days = int((current - baseline).total_seconds() // 86400)
-        if idle_days < threshold:
-            continue
-
-        finished = (
-            db.query(LessonProgress.id)
-            .filter(
-                LessonProgress.user_id == enrollment.student_id,
-                LessonProgress.course_id == course.id,
-                LessonProgress.completed.is_(True),
-                LessonProgress.lesson_id.in_(lesson_ids),
-            )
-            .count()
-        )
-        if finished >= len(lesson_ids):
-            continue
-
-        recently = (
-            db.query(Reminder.id)
-            .filter(
-                Reminder.source == "system",
-                Reminder.target_user_id == enrollment.student_id,
-                Reminder.course_id == course.id,
-                Reminder.title.like("学习召回%"),
-                Reminder.created_at >= current - cooldown,
-            )
-            .first()
-        )
-        if recently:
-            continue
-
-        reminder = Reminder(
-            course_id=course.id,
-            title=f"学习召回：{course.name}",
-            content=f"你已经 {idle_days} 天没有学习「{course.name}」，点击继续上课。",
-            due_at=current,
-            external_url=f"/courses?id={course.id}",
-            creator_id=enrollment.student_id,
-            target_user_id=enrollment.student_id,
-            source="system",
-            kind="general",
-        )
-        db.add(reminder)
-        db.flush()
-        # 直接落一条档位为 recall 的通知（不走 sync_reminder_notifications，
-        # 避免「今天到期」等到期提醒文案）；投递仍由 run_scan 统一处理
-        db.add(
-            Notification(
-                user_id=enrollment.student_id,
-                reminder_id=reminder.id,
-                course_id=course.id,
-                trigger_key="recall",
-                title=reminder.title,
-                body=reminder.content,
-                external_url=reminder.external_url,
-                due_at=current,
-                created_at=current,
-            )
-        )
-        created += 1
-    return created
-
-
 def run_scan() -> int:
     """线程中执行的一次扫描（调度器与测试共用）。"""
     db = SessionLocal()
     try:
         count = sync_due_notifications(db)
-        try:
-            # 学习召回：连续 N 天未学习的在学用户
-            count += sync_learning_recall(db)
-        except Exception:
-            # 召回失败不影响常规提醒扫描
-            logger.exception("学习召回扫描失败")
         db.commit()
-        # 站内通知落库后投递到手机；单次失败不影响下一轮提醒扫描
-        try:
-            delivered = push_service.deliver_pending(db)
-            if delivered:
-                logger.info("手机推送投递 %s 条", delivered)
-        except Exception:
-            logger.exception("手机推送投递失败")
-            db.rollback()
         return count
     except IntegrityError:
         # 多进程/多实例同时扫描时由唯一约束兜底

@@ -3,14 +3,10 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import Layout from './components/Layout'
 import AdminUser from './pages/AdminUser'
-import AiCheck from './pages/AiCheck'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
-import Family from './pages/Family'
 import Friends from './pages/Friends'
 import Home from './pages/Home'
-import Hospital from './pages/Hospital'
-import HealthProfile from './pages/HealthProfile'
 import LinkedInfo from './pages/LinkedInfo'
 import Login from './pages/Login'
 import Mall from './pages/Mall'
@@ -19,8 +15,6 @@ import Materials from './pages/Materials'
 import Me from './pages/Me'
 import NoticeDetail from './pages/NoticeDetail'
 import Notices from './pages/Notices'
-import Notifications from './pages/Notifications'
-import Orders from './pages/Orders'
 import ProfileEdit from './pages/ProfileEdit'
 import Reminders from './pages/Reminders'
 import Schedule from './pages/Schedule'
@@ -28,9 +22,6 @@ import Scores from './pages/Scores'
 import ServiceShop from './pages/ServiceShop'
 import Services from './pages/Services'
 import Supervision from './pages/Supervision'
-import SymptomDiary from './pages/SymptomDiary'
-import Toolkit from './pages/Toolkit'
-import Vitals from './pages/Vitals'
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
@@ -62,29 +53,20 @@ export default function App() {
         <Route index element={<Home />} />
         <Route path="notices" element={<Notices />} />
         <Route path="notices/:id" element={<NoticeDetail />} />
-        <Route path="notifications" element={<Notifications />} />
         <Route path="reminders" element={<Reminders />} />
         <Route path="community" element={<Community />} />
         <Route path="friends" element={<Friends />} />
         <Route path="mall" element={<Mall />} />
-        <Route path="orders" element={<Orders />} />
         <Route path="services" element={<Services />} />
-        <Route path="hospital" element={<Hospital />} />
-        <Route path="ai-check" element={<AiCheck />} />
-        <Route path="symptom-diary" element={<SymptomDiary />} />
-        <Route path="vitals" element={<Vitals />} />
         <Route path="courses" element={<Courses />} />
         <Route path="service-shop" element={<ServiceShop />} />
         <Route path="supervision" element={<Supervision />} />
         <Route path="materials" element={<Materials />} />
-        <Route path="toolkit" element={<Toolkit />} />
-        <Route path="family" element={<Family />} />
         <Route path="scores" element={<Scores />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="manage" element={<Manage />} />
         <Route path="admin-user" element={<AdminUser />} />
         <Route path="profile" element={<ProfileEdit />} />
-        <Route path="health-profile" element={<HealthProfile />} />
         <Route path="linked" element={<LinkedInfo />} />
         <Route path="me" element={<Me />} />
       </Route>

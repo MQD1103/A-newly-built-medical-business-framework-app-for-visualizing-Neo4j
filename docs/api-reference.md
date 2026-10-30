@@ -4,8 +4,8 @@
 > 自动生成，请勿手工编辑。接口变更后重新执行脚本即可同步。
 > 交互式文档（可试调用）以启动后的 `/docs` 为准。
 
-- 生成时间：2026-10-25 22:11
-- 接口总数：140
+- 生成时间：2026-10-19 22:46
+- 接口总数：130
 - OpenAPI 版本：3.1.0
 
 ## 认证方式
@@ -25,7 +25,7 @@ Authorization: Bearer <access_token>
 - [AI 用药检测（4）](#ai)
 - [登录与账号（6）](#auth)
 - [社区（9）](#community)
-- [课程与课时（18）](#courses)
+- [课程与课时（16）](#courses)
 - [好友与消息（10）](#friends)
 - [成绩（4）](#grades)
 - [首页（1）](#home)
@@ -34,11 +34,10 @@ Authorization: Bearer <access_token>
 - [商城（18）](#mall)
 - [资料（3）](#materials)
 - [通知公告（4）](#notices)
-- [站内通知（9）](#notifications)
+- [站内通知（4）](#notifications)
 - [提醒（6）](#reminders)
 - [课表与校历（7）](#schedule)
 - [服务商品（6）](#service-products)
-- [symptoms（3）](#symptoms)
 - [用户（2）](#users)
 - [其他（1）](#其他)
 
@@ -261,17 +260,6 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.course_id`（integer，必填）
   - 响应：`200` CoursePurchaseOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `GET /api/courses/{course_id}/quiz` — Get Quiz
-  - 说明：获取某门课的测验题（不返回答案）。
-  - 认证：需要登录
-  - 参数：`path.course_id`（integer，必填）
-  - 响应：`200` array<QuizQuestionOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `POST /api/courses/{course_id}/quiz` — Submit Quiz
-  - 说明：提交答案：后端判分、返回对错与解析，并保存一次作答记录。
-  - 认证：需要登录
-  - 参数：`path.course_id`（integer，必填）
-  - 请求体：`application/json` QuizSubmitIn（必填）
-  - 响应：`200` QuizResultOut（Successful Response）；`422` HTTPValidationError（Validation Error）
 
 ## 好友与消息
 
@@ -557,24 +545,6 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`query.unread_only`（boolean，可选）；`query.page`（integer，可选）；`query.page_size`（integer，可选）
   - 响应：`200` NotificationListOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `GET /api/notifications/push/config` — Push Config
-  - 说明：前端订阅所需的公开配置；私钥永远不出服务端。
-  - 认证：公开
-  - 响应：`200` -（Successful Response）
-- `GET /api/notifications/push/status` — Push Status
-  - 认证：需要登录
-  - 响应：`200` -（Successful Response）
-- `POST /api/notifications/push/subscribe` — Push Subscribe
-  - 认证：需要登录
-  - 请求体：`application/json` PushSubscriptionIn（必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `POST /api/notifications/push/test` — Push Test
-  - 认证：需要登录
-  - 响应：`200` -（Successful Response）
-- `POST /api/notifications/push/unsubscribe` — Push Unsubscribe
-  - 认证：需要登录
-  - 请求体：`application/json` PushUnsubscribeIn（必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
 - `POST /api/notifications/read-all` — Read All
   - 认证：需要登录
   - 响应：`200` -（Successful Response）
@@ -679,24 +649,6 @@ Authorization: Bearer <access_token>
   - 参数：`path.service_id`（integer，必填）
   - 响应：`200` ServicePurchaseOut（Successful Response）；`422` HTTPValidationError（Validation Error）
 
-## symptoms
-
-<a id="symptoms"></a>
-
-- `GET /api/symptoms` — Get Diary
-  - 认证：需要登录
-  - 参数：`query.days`（integer，可选）
-  - 响应：`200` SymptomDiaryOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `POST /api/symptoms` — Upsert Entry
-  - 说明：同一天再次提交视为更新，不产生重复记录。
-  - 认证：需要登录
-  - 请求体：`application/json` SymptomEntryIn（必填）
-  - 响应：`200` SymptomEntryOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `DELETE /api/symptoms/{entry_id}` — Delete Entry
-  - 认证：需要登录
-  - 参数：`path.entry_id`（integer，必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-
 ## 用户
 
 <a id="users"></a>
@@ -781,7 +733,6 @@ Authorization: Bearer <access_token>
 |------|------|------|------|
 | `file` | string (binary) | 是 | File |
 | `lesson_id` | integer | null | 否 | Lesson Id |
-| `mode` | string | 否 | Mode；默认 `oral` |
 
 ### Body_upload_avatar_api_auth_avatar_post
 
@@ -1587,7 +1538,6 @@ Authorization: Bearer <access_token>
 | `lesson_id` | integer | null | 否 | Lesson Id |
 | `status` | string | 否 | Status；默认 `completed` |
 | `provider` | string | 否 | Provider；默认 `demo` |
-| `mode` | string | 否 | Mode；默认 `oral` |
 | `steps` | array<MedicationStepOut> | 否 | Steps |
 | `needs_retry` | boolean | 否 | Needs Retry；默认 `False` |
 | `message` | string | 否 | Message |
@@ -1646,7 +1596,6 @@ Authorization: Bearer <access_token>
 | `created_at` | string (date-time) | 是 | Created At |
 | `read_at` | string | null | 否 | Read At |
 | `read` | boolean | 否 | Read；默认 `False` |
-| `click_url` | string | 否 | Click Url |
 
 ### ProfileUpdate
 
@@ -1655,45 +1604,6 @@ Authorization: Bearer <access_token>
 | `full_name` | string | null | 否 | Full Name |
 | `old_password` | string | null | 否 | Old Password |
 | `new_password` | string | null | 否 | New Password |
-
-### PushSubscriptionIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `endpoint` | string | 是 | Endpoint |
-| `keys` | PushSubscriptionKeysIn | 是 |  |
-| `user_agent` | string | 否 | User Agent |
-
-### PushUnsubscribeIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `endpoint` | string | 是 | Endpoint |
-
-### QuizQuestionOut
-
-下发给前端的题目：不带答案，防作弊。
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | integer | 是 | Id |
-| `question` | string | 是 | Question |
-| `options` | array<string> | 否 | Options |
-
-### QuizResultOut
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `course_id` | integer | 是 | Course Id |
-| `score` | integer | 是 | Score |
-| `total` | integer | 是 | Total |
-| `details` | array<QuizDetailOut> | 否 | Details |
-
-### QuizSubmitIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `answers` | object | 否 | Answers |
 
 ### ReminderCreate
 
@@ -1704,12 +1614,6 @@ Authorization: Bearer <access_token>
 | `due_at` | string (date-time) | 是 | Due At |
 | `external_url` | string | 否 | External Url |
 | `course_id` | integer | null | 否 | Course Id |
-| `kind` | string | 否 | Kind；默认 `general` |
-| `drug_name` | string | 否 | Drug Name |
-| `dosage` | string | 否 | Dosage |
-| `repeat_rule` | string | 否 | Repeat Rule；默认 `none` |
-| `check_type` | string | 否 | Check Type |
-| `prep_questions` | string | 否 | Prep Questions |
 
 ### ReminderDoneUpdate
 
@@ -1744,13 +1648,6 @@ Authorization: Bearer <access_token>
 | `completed_at` | string | null | 否 | Completed At |
 | `can_delete` | boolean | 否 | Can Delete；默认 `False` |
 | `can_edit` | boolean | 否 | Can Edit；默认 `False` |
-| `kind` | string | 否 | Kind；默认 `general` |
-| `drug_name` | string | 否 | Drug Name |
-| `dosage` | string | 否 | Dosage |
-| `repeat_rule` | string | 否 | Repeat Rule；默认 `none` |
-| `check_type` | string | 否 | Check Type |
-| `prep_questions` | string | 否 | Prep Questions |
-| `recurring_parent_id` | integer | null | 否 | Recurring Parent Id |
 
 ### ReminderUpdate
 
@@ -1761,12 +1658,6 @@ Authorization: Bearer <access_token>
 | `due_at` | string | null | 否 | Due At |
 | `external_url` | string | null | 否 | External Url |
 | `course_id` | integer | null | 否 | Course Id |
-| `kind` | string | null | 否 | Kind |
-| `drug_name` | string | null | 否 | Drug Name |
-| `dosage` | string | null | 否 | Dosage |
-| `repeat_rule` | string | null | 否 | Repeat Rule |
-| `check_type` | string | null | 否 | Check Type |
-| `prep_questions` | string | null | 否 | Prep Questions |
 
 ### ScheduleSlotCreate
 
@@ -1866,41 +1757,6 @@ Authorization: Bearer <access_token>
 | `refund_amount` | number | 否 | Refund Amount；默认 `0.0` |
 | `refunded_at` | string | null | 否 | Refunded At |
 | `refund_reason` | string | 否 | Refund Reason |
-
-### SymptomDiaryOut
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `items` | array<SymptomEntryOut> | 否 | Items |
-| `warning` | boolean | 否 | Warning；默认 `False` |
-| `warning_text` | string | 否 | Warning Text |
-| `disclaimer` | string | 否 | Disclaimer |
-
-### SymptomEntryIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `record_date` | string | null | 否 | Record Date |
-| `cough` | integer | 否 | Cough；默认 `0` |
-| `dyspnea` | integer | 否 | Dyspnea；默认 `0` |
-| `sputum` | integer | 否 | Sputum；默认 `0` |
-| `note` | string | 否 | Note |
-
-### SymptomEntryOut
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `id` | integer | 是 | Id |
-| `record_date` | string (date) | 是 | Record Date |
-| `cough` | integer | 否 | Cough；默认 `0` |
-| `dyspnea` | integer | 否 | Dyspnea；默认 `0` |
-| `sputum` | integer | 否 | Sputum；默认 `0` |
-| `note` | string | 否 | Note |
-| `total` | integer | 否 | Total；默认 `0` |
-| `warning` | boolean | 否 | Warning；默认 `False` |
-| `warning_text` | string | 否 | Warning Text |
-| `created_at` | string (date-time) | 是 | Created At |
-| `updated_at` | string (date-time) | 是 | Updated At |
 
 ### Token
 
