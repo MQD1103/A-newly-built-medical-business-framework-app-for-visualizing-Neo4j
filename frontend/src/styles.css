@@ -4061,3 +4061,39 @@ html.dark .mall-coupon-rule { color: #e8a35c; }
 html.dark .mall-section-head h2, html.dark .mall-section-head strong { color: var(--ink); }
 html.dark .mall-rank-name { color: var(--ink); }
 html.dark .mall-svc-name { color: var(--ink); }
+/* ---------- 用户协议 / 隐私政策 ---------- */
+.login-agreement { margin:12px 0 0; font-size:.72rem; color:#8a99ab; text-align:center; line-height:1.6; }
+.login-agreement a { color:#3b86e0; text-decoration:none; font-weight:600; }
+
+.agreement-doc { line-height:1.75; font-size:.86rem; color:#33445a; }
+.agreement-doc h2 { margin:.4rem 0 .2rem; font-size:1.15rem; font-weight:800; }
+.agreement-doc h3 { margin:1.1rem 0 .35rem; font-size:.95rem; font-weight:800; color:#22384f; }
+.agreement-doc h4 { margin:.8rem 0 .3rem; font-size:.88rem; font-weight:700; }
+.agreement-doc p { margin:.3rem 0; }
+.agreement-doc .agree-strong { font-weight:700; color:#22384f; }
+.agreement-doc .agree-ol { margin:.3rem 0 .5rem; padding-left:1.3rem; }
+.agreement-doc .agree-ol li { margin:.22rem 0; }
+
+.consent-mask { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(20,35,50,.55); backdrop-filter:blur(5px); animation:mallFadeIn .2s ease; }
+.consent-card { width:100%; max-width:430px; max-height:86vh; display:flex; flex-direction:column; background:#fff; border-radius:20px; padding:20px 20px 16px; box-shadow:0 24px 60px rgba(20,35,50,.32); animation:mallSlideUp .25s ease; }
+.consent-card h2 { margin:0 0 4px; font-size:1.15rem; font-weight:800; text-align:center; }
+.consent-lead { margin:0 0 10px; font-size:.8rem; color:#5a6d82; text-align:center; }
+.consent-tabs { display:flex; gap:8px; margin-bottom:10px; }
+.consent-tab { flex:1; padding:8px 10px; border:1.5px solid #e3ecf6; border-radius:12px; background:#f7fafd; color:#5a6d82; font-size:.8rem; font-weight:700; cursor:pointer; transition:all .15s ease; }
+.consent-tab.active { border-color:#3b86e0; background:rgba(59,134,224,.08); color:#2b6fc4; }
+.consent-body { flex:1; overflow-y:auto; padding:12px 14px; border:1px solid #edf3fa; border-radius:14px; background:#fbfdff; margin-bottom:12px; }
+.consent-summary { margin:.4rem 0; font-size:.82rem; line-height:1.7; color:#44586f; font-weight:600; }
+.consent-full summary { cursor:pointer; font-size:.78rem; font-weight:700; color:#3b86e0; padding:6px 0; }
+.consent-full .agreement-doc { margin-top:8px; padding-top:8px; border-top:1px dashed #dfe9f4; }
+.consent-foot { display:flex; justify-content:center; gap:18px; margin-top:10px; }
+.consent-foot .linkish { font-size:.78rem; }
+
+/* 黑夜模式 */
+html.dark .agreement-doc { color:#c6d4e3; }
+html.dark .agreement-doc h3, html.dark .agreement-doc .agree-strong { color:#e7eef7; }
+html.dark .consent-card { background:#1d2b3c; }
+html.dark .consent-tab { background:#243447; border-color:#33475e; color:#9fb2c6; }
+html.dark .consent-tab.active { border-color:#5ba3f5; background:rgba(91,163,245,.12); color:#8cc0f8; }
+html.dark .consent-body { background:#223349; border-color:#33475e; }
+html.dark .consent-full .agreement-doc { border-top-color:#33475e; }
+html.dark .login-agreement { color:#7d90a5; }

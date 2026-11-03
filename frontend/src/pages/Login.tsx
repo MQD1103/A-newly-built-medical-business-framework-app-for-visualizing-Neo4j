@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth'
 import { ApiError, api } from '../api'
 import { mediaUrl } from '../utils'
@@ -100,6 +100,12 @@ export default function Login() {
             <button className="btn primary block" type="submit" disabled={submitting}>
               {submitting ? '登录中…' : '登录'}
             </button>
+            <p className="login-agreement">
+              登录即表示您已阅读并同意
+              <Link to="/agreements/user-agreement">《用户协议》</Link>
+              与
+              <Link to="/agreements/privacy-policy">《隐私政策》</Link>
+            </p>
           </form>
 
           <div className="demo-box on-gradient">

@@ -193,3 +193,45 @@ export interface FriendActionResult {
   status: 'pending' | 'accepted'
   auto_accepted: boolean
 }
+
+export interface AgreementInfo {
+  agreement_type: string
+  title: string
+  version: string
+  effective_date: string
+  summary: string
+  content: string | null
+}
+
+export interface ConsentRecord {
+  agreement_type: string
+  version: string
+  accepted_at: string
+}
+
+export interface ConsentStatus {
+  consents: ConsentRecord[]
+  /** 尚未同意的现行版本协议类型；非空时前端应弹出确认弹窗 */
+  pending: string[]
+}
+
+export interface SymptomEntry {
+  id: number
+  record_date: string
+  cough: number
+  dyspnea: number
+  sputum: number
+  note: string
+  total: number
+  warning: boolean
+  warning_text: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SymptomDiary {
+  items: SymptomEntry[]
+  warning: boolean
+  warning_text: string
+  disclaimer: string
+}

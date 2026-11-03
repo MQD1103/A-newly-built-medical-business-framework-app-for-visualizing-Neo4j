@@ -307,3 +307,27 @@ backend\.venv\Scripts\python.exe backend\scripts\export_api_doc.py
   接口参考文档由代码自动导出，避免与实现脱节；商城登录、下单、支付、
   退款、升级、团购、服务订单、回调与管理员流程纳入可重复执行的自动冒烟测试。
 - **在什么时候**：2026-10-19 22:50
+
+## 技术文档（症状日记挂载修复 + 用户协议与隐私政策）
+
+- **操作人**：tky-cmd
+- **更改什么**：
+  - 修复：`main.py` 此前未挂载 `symptoms` 路由，且 `models.py` / `schemas.py`
+    缺少 `SymptomEntry` 与症状日记相关 schema，症状日记页面实际不可用；
+    本次补齐模型、schema 并注册路由，同时在服务页与路由中加入 `/symptom-diary` 入口；
+  - 新增：`backend/app/agreements.py`（《小医用户协议》v1.0.0 与《小医隐私政策》v1.0.0
+    全文与版本登记）、`backend/app/routers/agreements.py`
+    （`GET /api/agreements`、`GET /api/agreements/{type}` 公开；
+    `GET /api/consents/me`、`POST /api/consent` 登录可用）；
+  - 新增：`user_consents` 表（用户 + 协议类型 + 版本唯一，历史同意记录不删除）；
+  - 新增：前端 `pages/Agreements.tsx`（协议中心 / 全文阅读，登录页也可访问）、
+    `components/ConsentGate.tsx`（登录后未同意现行版本时全屏确认弹窗，
+    「不同意」即退出登录）、登录页协议链接、「我的」页协议入口；
+  - 新增：`backend/scripts/smoke_agreements_symptoms.py` 冒烟测试；
+  - 更新：`docs/api-reference.md`（130 → 144 个接口）。
+- **作用是什么**：补齐《技术说明》2.6（内容边界写进用户协议）与 6.14
+  （协议入口可被找到）的合规要求；症状日记从「代码存在但不可用」恢复为完整功能。
+  协议按「类型 + 版本」留痕，后续更新协议文本时在 `agreements.py` 递增版本号，
+  未同意新版的用户会再次收到确认弹窗，旧同意记录继续保留作为凭证。
+- **在什么时候**：2026-11-03 22:10
+

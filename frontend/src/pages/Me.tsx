@@ -88,6 +88,14 @@ export default function Me() {
           <span>通知公告</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/agreements/user-agreement" className="menu-row">
+          <span>用户协议</span>
+          <span className="chev">›</span>
+        </Link>
+        <Link to="/agreements/privacy-policy" className="menu-row">
+          <span>隐私政策</span>
+          <span className="chev">›</span>
+        </Link>
       </section>
 
       <button type="button" className="btn block ghost-danger" onClick={logout}>

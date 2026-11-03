@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth'
+import ConsentGate from './ConsentGate'
 
 const tabs = [
   { to: '/', label: '首页', icon: HomeIcon, end: true },
@@ -69,6 +70,8 @@ export default function Layout() {
         <main className="app-main">
           <Outlet />
         </main>
+        {/* 协议确认门：未同意现行版本协议时全屏遮罩，同意后才能继续使用 */}
+        <ConsentGate />
         {!hideTab && (
           <nav className="tabbar" aria-label="主导航">
             {tabs.map((t) => (

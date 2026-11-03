@@ -4,8 +4,8 @@
 > 自动生成，请勿手工编辑。接口变更后重新执行脚本即可同步。
 > 交互式文档（可试调用）以启动后的 `/docs` 为准。
 
-- 生成时间：2026-10-19 22:46
-- 接口总数：130
+- 生成时间：2026-11-03 22:05
+- 接口总数：144
 - OpenAPI 版本：3.1.0
 
 ## 认证方式
@@ -22,6 +22,7 @@ Authorization: Bearer <access_token>
 ## 模块索引
 
 - [管理中心（9）](#admin)
+- [agreements（4）](#agreements)
 - [AI 用药检测（4）](#ai)
 - [登录与账号（6）](#auth)
 - [社区（9）](#community)
@@ -32,12 +33,14 @@ Authorization: Bearer <access_token>
 - [医院对接（14）](#hospital)
 - [关联信息（6）](#links)
 - [商城（18）](#mall)
+- [mall-cart-coupon（7）](#mall-cart-coupon)
 - [资料（3）](#materials)
 - [通知公告（4）](#notices)
 - [站内通知（4）](#notifications)
 - [提醒（6）](#reminders)
 - [课表与校历（7）](#schedule)
 - [服务商品（6）](#service-products)
+- [symptoms（3）](#symptoms)
 - [用户（2）](#users)
 - [其他（1）](#其他)
 
@@ -90,6 +93,28 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.user_id`（integer，必填）；`path.service_id`（integer，必填）
   - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+
+## agreements
+
+<a id="agreements"></a>
+
+- `GET /api/agreements` — List Agreements
+  - 说明：协议目录（不含全文，全文走详情接口）。
+  - 认证：公开
+  - 响应：`200` array<AgreementOut>（Successful Response）
+- `GET /api/agreements/{agreement_type}` — Get Agreement Detail
+  - 说明：协议全文（Markdown 文本），登录页可直接访问。
+  - 认证：公开
+  - 参数：`path.agreement_type`（string，必填）
+  - 响应：`200` AgreementOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/consent` — Accept Agreement
+  - 说明：记录一条同意；重复同意同一版本保持幂等，返回已有记录。
+  - 认证：需要登录
+  - 请求体：`application/json` ConsentCreate（必填）
+  - 响应：`200` ConsentOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/consents/me` — My Consents
+  - 认证：需要登录
+  - 响应：`200` ConsentStatusOut（Successful Response）
 
 ## AI 用药检测
 
@@ -500,6 +525,36 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 响应：`200` MallSummaryOut（Successful Response）
 
+## mall-cart-coupon
+
+<a id="mall-cart-coupon"></a>
+
+- `GET /api/mall/cart` — Get Cart
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+- `DELETE /api/mall/cart` — Clear Cart
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+- `POST /api/mall/cart/{course_id}` — Add To Cart
+  - 认证：需要登录
+  - 参数：`path.course_id`（integer，必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `DELETE /api/mall/cart/{course_id}` — Remove From Cart
+  - 认证：需要登录
+  - 参数：`path.course_id`（integer，必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/mall/checkout` — Checkout Cart
+  - 认证：需要登录
+  - 请求体：`application/json` CheckoutIn（必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/mall/coupons` — List Coupons
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+- `POST /api/mall/coupons/claim` — Claim Coupon
+  - 认证：需要登录
+  - 请求体：`application/json` ClaimIn（必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+
 ## 资料
 
 <a id="materials"></a>
@@ -649,6 +704,24 @@ Authorization: Bearer <access_token>
   - 参数：`path.service_id`（integer，必填）
   - 响应：`200` ServicePurchaseOut（Successful Response）；`422` HTTPValidationError（Validation Error）
 
+## symptoms
+
+<a id="symptoms"></a>
+
+- `GET /api/symptoms` — Get Diary
+  - 认证：需要登录
+  - 参数：`query.days`（integer，可选）
+  - 响应：`200` SymptomDiaryOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/symptoms` — Upsert Entry
+  - 说明：同一天再次提交视为更新，不产生重复记录。
+  - 认证：需要登录
+  - 请求体：`application/json` SymptomEntryIn（必填）
+  - 响应：`200` SymptomEntryOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `DELETE /api/symptoms/{entry_id}` — Delete Entry
+  - 认证：需要登录
+  - 参数：`path.entry_id`（integer，必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+
 ## 用户
 
 <a id="users"></a>
@@ -720,6 +793,19 @@ Authorization: Bearer <access_token>
 | `full_name` | string | null | 否 | Full Name |
 | `new_password` | string | null | 否 | New Password |
 
+### AgreementOut
+
+协议元信息；content 仅在详情接口返回，列表接口为空以减小响应体。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `agreement_type` | string | 是 | Agreement Type |
+| `title` | string | 是 | Title |
+| `version` | string | 是 | Version |
+| `effective_date` | string | 是 | Effective Date |
+| `summary` | string | 否 | Summary |
+| `content` | string | null | 否 | Content |
+
 ### AvatarPreviewOut
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -770,6 +856,18 @@ Authorization: Bearer <access_token>
 | `title` | string | 是 | Title |
 | `event_date` | string (date) | 是 | Event Date |
 | `description` | string | 是 | Description |
+
+### CheckoutIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `coupon_code` | string | null | 否 | Coupon Code |
+
+### ClaimIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `code` | string | 是 | Code |
 
 ### CommunityCommentCreate
 
@@ -829,6 +927,30 @@ Authorization: Bearer <access_token>
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `content` | string | 否 | Content |
+
+### ConsentCreate
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `agreement_type` | string | 是 | Agreement Type |
+| `version` | string | null | 否 | Version |
+
+### ConsentOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `agreement_type` | string | 是 | Agreement Type |
+| `version` | string | 是 | Version |
+| `accepted_at` | string (date-time) | 是 | Accepted At |
+
+### ConsentStatusOut
+
+当前用户全部同意记录 + 尚未同意的现行版本协议类型。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `consents` | array<ConsentOut> | 否 | Consents |
+| `pending` | array<string> | 否 | Pending |
 
 ### CourseCreate
 
@@ -1757,6 +1879,41 @@ Authorization: Bearer <access_token>
 | `refund_amount` | number | 否 | Refund Amount；默认 `0.0` |
 | `refunded_at` | string | null | 否 | Refunded At |
 | `refund_reason` | string | 否 | Refund Reason |
+
+### SymptomDiaryOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `items` | array<SymptomEntryOut> | 否 | Items |
+| `warning` | boolean | 否 | Warning；默认 `False` |
+| `warning_text` | string | 否 | Warning Text |
+| `disclaimer` | string | 否 | Disclaimer |
+
+### SymptomEntryIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `record_date` | string | null | 否 | Record Date |
+| `cough` | integer | 否 | Cough；默认 `0` |
+| `dyspnea` | integer | 否 | Dyspnea；默认 `0` |
+| `sputum` | integer | 否 | Sputum；默认 `0` |
+| `note` | string | 否 | Note |
+
+### SymptomEntryOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `record_date` | string (date) | 是 | Record Date |
+| `cough` | integer | 是 | Cough |
+| `dyspnea` | integer | 是 | Dyspnea |
+| `sputum` | integer | 是 | Sputum |
+| `note` | string | 否 | Note |
+| `total` | integer | 否 | Total；默认 `0` |
+| `warning` | boolean | 否 | Warning；默认 `False` |
+| `warning_text` | string | 否 | Warning Text |
+| `created_at` | string (date-time) | 是 | Created At |
+| `updated_at` | string (date-time) | 是 | Updated At |
 
 ### Token
 

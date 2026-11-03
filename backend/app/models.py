@@ -800,3 +800,54 @@ class CartItem(Base):
 
     user: Mapped[User] = relationship()
     course: Mapped[Course] = relationship()
+
+
+class SymptomEntry(Base):
+    """症状日记：每日咳嗽 / 气短 / 痰量自评（0-3），同一用户同一天只有一条。"""
+
+    __tablename__ = "symptom_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "record_date", name="uq_symptom_user_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    record_date: Mapped[date] = mapped_column(Date, index=True)
+    cough: Mapped[int] = mapped_column(Integer, default=0)
+    dyspnea: Mapped[int] = mapped_column(Integer, default=0)
+    sputum: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()
+
+
+class UserConsent(Base):
+    """用户协议 / 隐私政策的同意记录：按「协议类型 + 版本」逐条留痕。
+
+    协议文本更新版本后，未同意新版本的用户会再次收到确认弹窗；
+    历史同意记录永不删除，作为合规凭证。
+    """
+
+    __tablename__ = "user_consents"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "agreement_type", "version", name="uq_user_consent"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # user_agreement=用户协议；privacy_policy=隐私政策
+    agreement_type: Mapped[str] = mapped_column(String(40), index=True)
+    version: Mapped[str] = mapped_column(String(20))
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+
+    user: Mapped[User] = relationship()

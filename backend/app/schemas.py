@@ -993,3 +993,72 @@ class MedicationCheckListOut(BaseModel):
     page_size: int = 20
     retention_days: int = 30
     disclaimer: str = ""
+
+
+# ---------- 症状日记 ----------
+
+
+class SymptomEntryIn(BaseModel):
+    record_date: date | None = None  # 缺省为今天；不能是未来日期
+    cough: int = Field(ge=0, le=3, default=0)
+    dyspnea: int = Field(ge=0, le=3, default=0)
+    sputum: int = Field(ge=0, le=3, default=0)
+    note: str = Field(default="", max_length=1000)
+
+
+class SymptomEntryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    record_date: date
+    cough: int
+    dyspnea: int
+    sputum: int
+    note: str = ""
+    total: int = 0
+    warning: bool = False
+    warning_text: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class SymptomDiaryOut(BaseModel):
+    items: list[SymptomEntryOut] = Field(default_factory=list)
+    warning: bool = False
+    warning_text: str = ""
+    disclaimer: str = ""
+
+
+# ---------- 用户协议 / 隐私政策 ----------
+
+
+class AgreementOut(BaseModel):
+    """协议元信息；content 仅在详情接口返回，列表接口为空以减小响应体。"""
+
+    agreement_type: str
+    title: str
+    version: str
+    effective_date: str
+    summary: str = ""
+    content: str | None = None
+
+
+class ConsentCreate(BaseModel):
+    agreement_type: str
+    # 缺省视为同意当前线上版本
+    version: str | None = None
+
+
+class ConsentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    agreement_type: str
+    version: str
+    accepted_at: datetime
+
+
+class ConsentStatusOut(BaseModel):
+    """当前用户全部同意记录 + 尚未同意的现行版本协议类型。"""
+
+    consents: list[ConsentOut] = Field(default_factory=list)
+    pending: list[str] = Field(default_factory=list)

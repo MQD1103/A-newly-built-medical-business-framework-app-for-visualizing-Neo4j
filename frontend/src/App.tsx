@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth'
 import Layout from './components/Layout'
 import AdminUser from './pages/AdminUser'
+import Agreements from './pages/Agreements'
 import Community from './pages/Community'
 import Courses from './pages/Courses'
 import Friends from './pages/Friends'
@@ -21,6 +22,7 @@ import Schedule from './pages/Schedule'
 import Scores from './pages/Scores'
 import ServiceShop from './pages/ServiceShop'
 import Services from './pages/Services'
+import SymptomDiary from './pages/SymptomDiary'
 import Supervision from './pages/Supervision'
 
 function Protected({ children }: { children: ReactNode }) {
@@ -42,6 +44,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* 协议页放在登录保护之外：登录页也要能查看用户协议与隐私政策 */}
+      <Route path="/agreements" element={<Agreements />} />
+      <Route path="/agreements/:type" element={<Agreements />} />
       <Route
         path="/"
         element={
@@ -69,6 +74,7 @@ export default function App() {
         <Route path="profile" element={<ProfileEdit />} />
         <Route path="linked" element={<LinkedInfo />} />
         <Route path="me" element={<Me />} />
+        <Route path="symptom-diary" element={<SymptomDiary />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

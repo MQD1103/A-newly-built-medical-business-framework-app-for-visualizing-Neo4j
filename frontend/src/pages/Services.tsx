@@ -29,6 +29,14 @@ const entries = [
     tag: '信息关联',
     tone: 'c' as const,
   },
+  {
+    to: '/symptom-diary',
+    icon: '📋',
+    title: '症状日记',
+    desc: '每天记录咳嗽、气短与痰量，变化趋势和就医提示',
+    tag: '自我观察',
+    tone: 'a' as const,
+  },
 ]
 
 export default function Services() {
