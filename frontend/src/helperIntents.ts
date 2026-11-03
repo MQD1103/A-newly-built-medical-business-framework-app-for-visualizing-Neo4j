@@ -170,6 +170,13 @@ export const INTENTS: Intent[] = [
       ['咳嗽记录', 8],
       ['气短记录', 8],
       ['记录症状', 9],
+      // 口语说法：语音输入很少会说“症状日记”这四个字
+      ['症状', 8],
+      ['咳嗽', 7],
+      ['气喘', 7],
+      ['气短', 7],
+      ['咳痰', 7],
+      ['呼吸困难', 8],
     ],
   },
   {
@@ -309,7 +316,7 @@ export const INTENTS: Intent[] = [
   },
 ]
 
-export const SUGGESTIONS = ['我的成绩', '课表', '买课', '加好友', '提醒', '商城']
+export const SUGGESTIONS = ['记录症状', '买课', '我的订单', '医院资料', '提醒', '社区']
 
 /** 去掉空白与标点，避免“成 绩”“成绩？”这类输入匹配不上 */
 export function normalize(text: string): string {

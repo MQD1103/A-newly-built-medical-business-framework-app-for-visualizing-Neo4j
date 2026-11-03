@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { useAuth } from '../auth'
+import VoiceMic from '../components/VoiceMic'
 
 const entries = [
   {
@@ -349,6 +350,7 @@ export default function Mall() {
           {keyword && (
             <button type="button" className="mall-search-clear" onClick={() => setKeyword('')} aria-label="清空">×</button>
           )}
+          <VoiceMic onInterim={setKeyword} onFinal={setKeyword} />
         </div>
         <div className="mall-tabs">
           {([['all', '全部'], ['course', '课程'], ['service', '服务']] as [FilterTab, string][]).map(([k, label]) => (

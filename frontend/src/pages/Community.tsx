@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, apiUpload } from '../api'
 import { useAuth } from '../auth'
+import VoiceMic from '../components/VoiceMic'
 import type { FriendActionResult, FriendState, FriendSummary } from '../types'
 import { formatDateTime, friendActionLabel, mediaUrl, roleLabel } from '../utils'
 
@@ -388,6 +389,7 @@ export default function Community() {
           {search && (
             <button type="button" className="community-search-clear" onClick={() => setSearch('')} aria-label="清空">×</button>
           )}
+          <VoiceMic onInterim={setSearch} onFinal={setSearch} />
         </div>
         <div className="community-topics">
           {['康复日记', '用药交流', '饮食分享', '心情树洞'].map((t) => (

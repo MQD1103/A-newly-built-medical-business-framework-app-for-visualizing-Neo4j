@@ -331,3 +331,23 @@ backend\.venv\Scripts\python.exe backend\scripts\export_api_doc.py
   未同意新版的用户会再次收到确认弹窗，旧同意记录继续保留作为凭证。
 - **在什么时候**：2026-11-03 22:10
 
+
+## 技术文档（语音输入：首页小助手恢复 + 社区/商城搜索框语音输入）
+
+- **操作人**：tky-cmd
+- **更改什么**：
+  - 恢复：首页小助手 HelperOrb（长按说话/点击打字跳转）此前在 6bbef90
+    中被误删挂载与全部样式，本次恢复 Layout.tsx 挂载与 380 行样式
+    （含黑夜模式适配），并为 helperIntents.ts 补口语关键词
+    （症状/咳嗽/气喘/气短/咳痰/呼吸困难），快捷语改为医疗场景；
+  - 新增：`frontend/src/components/VoiceMic.tsx` 可复用语音输入组件
+    （Web Speech API zh-CN，interimResults 实时出字；气泡提示
+    「正在听，请开始讲话…」，不支持/权限被拒/网络不通均有对应文案）；
+  - 接入：社区搜索框（Community.tsx）与商城搜索框（Mall.tsx）；
+  - 样式：`styles.css` 新增 `.voice-mic` / `.voice-tip`（含黑夜模式）。
+- **作用是什么**：语音入口统一走浏览器 Web Speech API，无需后端改动。
+  注意事项：Chrome 识别服务国内可能不通（提示改打字）；微信内置浏览器
+  不支持（麦克风按钮仍显示，点击给出提示）；页面需 https 或 localhost
+  才能获得麦克风权限。
+- **在什么时候**：2026-11-03 22:56
+
