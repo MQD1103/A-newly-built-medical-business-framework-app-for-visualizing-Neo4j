@@ -112,17 +112,22 @@ export default function SymptomDiaryPage() {
 
   return (
     <div className="screen stack-gap">
-      <Link to="/services" className="back-link">
-        ← 返回服务
+      <Link to="/supervision" className="back-link">
+        ← 返回监督
       </Link>
       <div className="page-title">
         <div>
           <h1>症状日记</h1>
           <p className="sub">每天记录咳嗽、气短与痰量，观察变化趋势</p>
         </div>
-        <Link to="/vitals" className="linkish">
-          健康监测 ›
-        </Link>
+        <div className="page-title-actions-only">
+          <Link to="/supervision/medication" className="linkish">
+            用药打卡 ›
+          </Link>
+          <Link to="/supervision/followups" className="linkish">
+            随访提醒 ›
+          </Link>
+        </div>
       </div>
 
       {error ? <p className="error">{error}</p> : null}

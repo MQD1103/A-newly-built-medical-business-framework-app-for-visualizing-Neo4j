@@ -64,6 +64,10 @@ class Course(Base):
     valid_days: Mapped[int] = mapped_column(Integer, default=730)
     # 每个付费课程开放试看的节数（从第 1 节起）
     trial_lesson_count: Mapped[int] = mapped_column(Integer, default=1)
+    # 用途分类，如「入门与自测」「用药与氧疗」（供商城目录侧栏筛选）
+    category: Mapped[str] = mapped_column(String(40), default="", index=True)
+    # 适用人群，如「新确诊患者」「家属照护者」（表示该课对哪类人群更合适）
+    audience: Mapped[str] = mapped_column(String(40), default="", index=True)
 
     teacher: Mapped[User | None] = relationship(back_populates="taught_courses")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="course")
@@ -268,6 +272,20 @@ class Reminder(Base):
     )
     # user=个人添加；manager=教师/管理员；system=系统种子
     source: Mapped[str] = mapped_column(String(20), default="manager", index=True)
+    # general=普通事项；medication=用药/吸入提醒；checkup=复查/检查提醒
+    kind: Mapped[str] = mapped_column(String(20), default="general", index=True)
+    # 用药提醒：药名与剂量/用法（如“布地奈德 · 每次 1 吸”）
+    drug_name: Mapped[str] = mapped_column(String(120), default="")
+    dosage: Mapped[str] = mapped_column(String(120), default="")
+    # none / daily / weekly：完成后自动生成下一周期的提醒
+    repeat_rule: Mapped[str] = mapped_column(String(20), default="none")
+    # 检查提醒：检查类型与就诊前可准备的问题
+    check_type: Mapped[str] = mapped_column(String(120), default="")
+    prep_questions: Mapped[str] = mapped_column(Text, default="")
+    # 重复提醒生成下一周期时，指回最初那条提醒
+    recurring_parent_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=None
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     course: Mapped[Course] = relationship(back_populates="reminders")
@@ -634,6 +652,54 @@ class Notification(Base):
     course: Mapped[Course | None] = relationship()
 
 
+class PushSubscription(Base):
+    """用户设备（浏览器）的 Web Push 订阅。
+
+    endpoint 由浏览器推送服务下发，同一设备重复授权时按 endpoint 覆盖。
+    这里只保存投递所需的技术参数，不保存病历、用药等业务内容。
+    """
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (UniqueConstraint("endpoint", name="uq_push_endpoint"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    endpoint: Mapped[str] = mapped_column(String(500))
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth: Mapped[str] = mapped_column(String(100))
+    user_agent: Mapped[str] = mapped_column(String(300), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    # 只记录简短错误描述，不记录完整 endpoint（endpoint 本身可作为推送凭据）
+    last_error: Mapped[str] = mapped_column(String(300), default="")
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()
+
+
+class PushDelivery(Base):
+    """站内通知的推送投递记录，保证同一条通知只推一次。"""
+
+    __tablename__ = "push_deliveries"
+    __table_args__ = (
+        UniqueConstraint("notification_id", name="uq_push_delivery_notification"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    notification_id: Mapped[int] = mapped_column(
+        ForeignKey("notifications.id"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    # sent=至少一台设备成功；failed=尝试过但失败；skipped=无订阅/未启用
+    status: Mapped[str] = mapped_column(String(20), default="skipped")
+    detail: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class HospitalPartner(Base):
     """已开通的合作医院。
 
@@ -765,6 +831,8 @@ class MedicationCheck(Base):
     lesson_id: Mapped[int | None] = mapped_column(
         ForeignKey("lessons.id"), nullable=True, index=True, default=None
     )
+    # oral=口服，inhale=吸入；仅用于选择对应的演示/检测步骤
+    mode: Mapped[str] = mapped_column(String(20), default="oral")
     # completed=检测完成；failed=检测服务异常，仅保留错误摘要
     status: Mapped[str] = mapped_column(String(20), default="completed", index=True)
     provider: Mapped[str] = mapped_column(String(20), default="demo")
@@ -783,17 +851,40 @@ class MedicationCheck(Base):
     lesson: Mapped[Lesson | None] = relationship()
 
 
-class CartItem(Base):
-    """购物车条目：加车 → 结算 → 下单（同一用户同一课程只有一条）。"""
+class QuizQuestion(Base):
+    """板块测验选择题（每门课一组，答完即时判分并给解析）。"""
 
-    __tablename__ = "cart_items"
-    __table_args__ = (
-        UniqueConstraint("user_id", "course_id", name="uq_cart_user_course"),
+    __tablename__ = "quiz_questions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    # JSON 数组字符串，如 ["选项A", "选项B", "选项C", "选项D"]
+    options: Mapped[str] = mapped_column(Text, default="[]")
+    # 正确选项下标（0 = 第一个选项）
+    answer_index: Mapped[int] = mapped_column(Integer, default=0)
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    # 错题回看对应的课时；旧数据可为空
+    lesson_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lessons.id"), nullable=True, index=True, default=None
     )
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    lesson: Mapped[Lesson | None] = relationship()
+
+
+class QuizAttempt(Base):
+    """用户一次测验的作答记录（用于错题回看与历史成绩）。"""
+
+    __tablename__ = "quiz_attempts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     course_id: Mapped[int] = mapped_column(ForeignKey("courses.id"), index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    # JSON 数组：[{"question_id": 1, "chosen": 2, "correct": true}, ...]
+    answers_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, index=True
     )
@@ -803,7 +894,7 @@ class CartItem(Base):
 
 
 class SymptomEntry(Base):
-    """症状日记：每日咳嗽 / 气短 / 痰量自评（0-3），同一用户同一天只有一条。"""
+    """症状日记：每天一条，记录咳嗽 / 气短 / 痰量 0–3 级。"""
 
     __tablename__ = "symptom_entries"
     __table_args__ = (
@@ -817,9 +908,7 @@ class SymptomEntry(Base):
     dyspnea: Mapped[int] = mapped_column(Integer, default=0)
     sputum: Mapped[int] = mapped_column(Integer, default=0)
     note: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
@@ -827,27 +916,174 @@ class SymptomEntry(Base):
     user: Mapped[User] = relationship()
 
 
-class UserConsent(Base):
-    """用户协议 / 隐私政策的同意记录：按「协议类型 + 版本」逐条留痕。
+class HealthProfile(Base):
+    """个人健康档案：诊断、肺功能分级、用药史与紧急联系人。
 
-    协议文本更新版本后，未同意新版本的用户会再次收到确认弹窗；
-    历史同意记录永不删除，作为合规凭证。
+    每个用户一条（user_id 唯一）；仅本人与管理员可读写，供就诊时快速出示。
     """
 
-    __tablename__ = "user_consents"
-    __table_args__ = (
-        UniqueConstraint(
-            "user_id", "agreement_type", "version", name="uq_user_consent"
-        ),
-    )
+    __tablename__ = "health_profiles"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_health_profile_user"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
-    # user_agreement=用户协议；privacy_policy=隐私政策
-    agreement_type: Mapped[str] = mapped_column(String(40), index=True)
-    version: Mapped[str] = mapped_column(String(20))
-    accepted_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, index=True
+
+    # 个人信息
+    sex: Mapped[str] = mapped_column(String(10), default="")
+    birth_year: Mapped[str] = mapped_column(String(10), default="")
+    height_cm: Mapped[str] = mapped_column(String(10), default="")
+    weight_kg: Mapped[str] = mapped_column(String(10), default="")
+    blood_type: Mapped[str] = mapped_column(String(10), default="")
+
+    # 诊断与肺功能
+    diagnosis: Mapped[str] = mapped_column(String(120), default="")
+    diagnosed_at: Mapped[str] = mapped_column(String(20), default="")
+    copd_grade: Mapped[str] = mapped_column(String(20), default="")
+    fev1_percent: Mapped[str] = mapped_column(String(10), default="")
+    fev1_fvc: Mapped[str] = mapped_column(String(10), default="")
+    oxygen_target: Mapped[str] = mapped_column(String(30), default="")
+
+    # 用药与病史
+    current_meds: Mapped[str] = mapped_column(Text, default="")
+    allergies: Mapped[str] = mapped_column(Text, default="")
+    past_history: Mapped[str] = mapped_column(Text, default="")
+
+    # 紧急联系人
+    emergency_name: Mapped[str] = mapped_column(String(60), default="")
+    emergency_relation: Mapped[str] = mapped_column(String(30), default="")
+    emergency_phone: Mapped[str] = mapped_column(String(40), default="")
+
+    # 主治医生
+    doctor_name: Mapped[str] = mapped_column(String(60), default="")
+    doctor_hospital: Mapped[str] = mapped_column(String(120), default="")
+    doctor_dept: Mapped[str] = mapped_column(String(60), default="")
+    doctor_phone: Mapped[str] = mapped_column(String(40), default="")
+
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
+    user: Mapped[User] = relationship()
+
+
+class MedicationPlan(Base):
+    """用药计划：一种药的长期服用安排，是用药打卡的依据。
+
+    只记录用户自己填写的用法用量，用于打卡与依从性回顾，不给用药建议。
+    """
+
+    __tablename__ = "medication_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    drug_name: Mapped[str] = mapped_column(String(120))
+    # 剂量/用法，如「每次 1 吸」「每次 1 片」
+    dosage: Mapped[str] = mapped_column(String(120), default="")
+    # 每日次数 1–6，决定每天生成几个打卡槽位
+    frequency: Mapped[int] = mapped_column(Integer, default=1)
+    # 计划时间点，逗号分隔的 HH:MM（如 "08:00,20:00"），留空表示不限时间
+    times: Mapped[str] = mapped_column(String(200), default="")
+    start_date: Mapped[date] = mapped_column(Date)
+    # 为空表示长期服用
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True, default=None)
+    # active=进行中 / paused=已暂停 / archived=已停用
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()
+    logs: Mapped[list["MedicationLog"]] = relationship(back_populates="plan")
+
+
+class MedicationLog(Base):
+    """用药打卡记录：一条 = 某个计划某天的第 N 次用药。
+
+    (plan_id, take_date, slot) 唯一，重复打卡是更新而不是新增。
+    """
+
+    __tablename__ = "medication_logs"
+    __table_args__ = (
+        UniqueConstraint("plan_id", "take_date", "slot", name="uq_medication_log"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("medication_plans.id"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    take_date: Mapped[date] = mapped_column(Date, index=True)
+    # 第几次（1 起）
+    slot: Mapped[int] = mapped_column(Integer, default=1)
+    scheduled_time: Mapped[str] = mapped_column(String(8), default="")
+    # pending=待打卡 / taken=已服用 / skipped=已跳过
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    plan: Mapped[MedicationPlan] = relationship(back_populates="logs")
+    user: Mapped[User] = relationship()
+
+
+class FollowUpPlan(Base):
+    """随访计划：出院/门诊后的定期复查安排。
+
+    每次完成随访后按 interval_days 滚动出下一次到期日；
+    reminder_id 指向一条影子提醒，复用现有提醒→站内通知→手机推送链路。
+    """
+
+    __tablename__ = "followup_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    # outpatient=门诊随访 / lung_function=肺功能复查 /
+    # imaging=影像复查 / phone=电话随访 / other=其他
+    follow_type: Mapped[str] = mapped_column(String(40), default="outpatient")
+    # 随访周期（天）：30/90/180/365 常见
+    interval_days: Mapped[int] = mapped_column(Integer, default=90)
+    last_visit_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    next_due_date: Mapped[date] = mapped_column(Date, index=True)
+    hospital: Mapped[str] = mapped_column(String(120), default="")
+    doctor: Mapped[str] = mapped_column(String(60), default="")
+    # active=进行中 / paused=已暂停 / closed=已结束
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    reminder_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reminders.id"), nullable=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    user: Mapped[User] = relationship()
+    visits: Mapped[list["FollowUpVisit"]] = relationship(back_populates="plan")
+
+
+class FollowUpVisit(Base):
+    """随访记录：一次实际完成的随访，保存结果与当时算出的下次到期日。"""
+
+    __tablename__ = "followup_visits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("followup_plans.id"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    visit_date: Mapped[date] = mapped_column(Date, index=True)
+    # 结果/备注，用户自己填写，不做诊断结论
+    result: Mapped[str] = mapped_column(Text, default="")
+    next_due_date: Mapped[date] = mapped_column(Date)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    plan: Mapped[FollowUpPlan] = relationship(back_populates="visits")
     user: Mapped[User] = relationship()

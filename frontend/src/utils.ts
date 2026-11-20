@@ -34,6 +34,30 @@ export function formatDate(iso: string): string {
   })
 }
 
+/** 本机今天的 YYYY-MM-DD（给日期输入框的 max / 默认值用） */
+export function todayISO(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** 相对今天偏移 n 天的 YYYY-MM-DD */
+export function offsetISO(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** 距某日期还有几天；负数表示已过去 */
+export function daysUntil(iso: string): number {
+  const target = new Date(iso.includes('T') ? iso : `${iso}T00:00:00`).getTime()
+  if (!Number.isFinite(target)) return 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((target - today.getTime()) / 86_400_000)
+}
+
 export function roleLabel(role: string): string {
   if (role === 'student') return '用户'
   if (role === 'teacher') return '用户'
@@ -74,3 +98,7 @@ export function friendActionLabel(state: string, hasActed: boolean): string | nu
   if (state === 'pending_out') return hasActed ? '已发送申请' : '待验证'
   return hasActed ? '已发送申请' : '加好友'
 }
+
+/** 源码仓库地址：页面上的「GitHub 仓库」入口统一引用这里，改地址只改一处 */
+export const REPO_URL =
+  'https://github.com/MQD1103/A-newly-built-medical-business-framework-app-for-visualizing-Neo4j'

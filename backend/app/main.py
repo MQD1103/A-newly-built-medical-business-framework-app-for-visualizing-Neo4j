@@ -14,19 +14,20 @@ from .database import Base, SessionLocal, engine
 from .observability import install_observability
 from .routers import (
     admin,
-    agreements,
     ai,
     auth,
-    cart,
     community,
     courses,
+    followups,
     friends,
     grades,
+    health,
     home,
     hospital,
     links,
     mall,
     materials,
+    medication,
     notices,
     notifications,
     reminders,
@@ -92,9 +93,9 @@ app.include_router(users.router)
 app.include_router(notices.router)
 app.include_router(notifications.router)
 app.include_router(courses.router)
+app.include_router(courses.lesson_quiz_router)
 app.include_router(service_products.router)
 app.include_router(mall.router)
-app.include_router(cart.router)
 app.include_router(reminders.router)
 app.include_router(schedule.router)
 app.include_router(community.router)
@@ -105,7 +106,9 @@ app.include_router(links.router)
 app.include_router(hospital.router)
 app.include_router(ai.router)
 app.include_router(symptoms.router)
-app.include_router(agreements.router)
+app.include_router(medication.router)
+app.include_router(followups.router)
+app.include_router(health.router)
 app.include_router(home.router)
 app.include_router(admin.router)
 

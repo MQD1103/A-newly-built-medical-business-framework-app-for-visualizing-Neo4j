@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { apiUrl, getToken } from '../api'
 import { useAuth } from '../auth'
-import { mediaUrl, roleLabel } from '../utils'
+import { mediaUrl, roleLabel, REPO_URL } from '../utils'
 
 export default function Me() {
   const { user, logout, refresh } = useAuth()
@@ -84,18 +84,41 @@ export default function Me() {
           <span>修改资料</span>
           <span className="chev">›</span>
         </Link>
+        <Link to="/health-profile" className="menu-row">
+          <span className="menu-row-main">
+            <span>🩺 个人健康档案</span>
+            <span className="meta">诊断 · 肺功能分级 · 用药 · 紧急联系人</span>
+          </span>
+          <span className="chev">›</span>
+        </Link>
+        <Link to="/toolkit" className="menu-row">
+          <span>学习工具箱 · 量表 / 记录表 / 手册</span>
+          <span className="chev">›</span>
+        </Link>
+        <Link to="/family" className="menu-row">
+          <span>👨‍👩‍👧 家属照护专区</span>
+          <span className="chev">›</span>
+        </Link>
+        <Link to="/notifications" className="menu-row">
+          <span>消息通知</span>
+          <span className="chev">›</span>
+        </Link>
         <Link to="/notices" className="menu-row">
           <span>通知公告</span>
           <span className="chev">›</span>
         </Link>
-        <Link to="/agreements/user-agreement" className="menu-row">
-          <span>用户协议</span>
-          <span className="chev">›</span>
-        </Link>
-        <Link to="/agreements/privacy-policy" className="menu-row">
-          <span>隐私政策</span>
-          <span className="chev">›</span>
-        </Link>
+        <a
+          className="menu-row menu-row-link"
+          href={REPO_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          <span className="menu-row-main">
+            <span>GitHub 仓库</span>
+            <span className="meta">源码、提交记录与更新日志</span>
+          </span>
+          <span className="chev">↗</span>
+        </a>
       </section>
 
       <button type="button" className="btn block ghost-danger" onClick={logout}>

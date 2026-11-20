@@ -4,8 +4,8 @@
 > 自动生成，请勿手工编辑。接口变更后重新执行脚本即可同步。
 > 交互式文档（可试调用）以启动后的 `/docs` 为准。
 
-- 生成时间：2026-11-03 22:05
-- 接口总数：144
+- 生成时间：2026-10-28 15:35
+- 接口总数：160
 - OpenAPI 版本：3.1.0
 
 ## 认证方式
@@ -22,21 +22,22 @@ Authorization: Bearer <access_token>
 ## 模块索引
 
 - [管理中心（9）](#admin)
-- [agreements（4）](#agreements)
 - [AI 用药检测（4）](#ai)
 - [登录与账号（6）](#auth)
 - [社区（9）](#community)
-- [课程与课时（16）](#courses)
+- [课程与课时（20）](#courses)
+- [followups（8）](#followups)
 - [好友与消息（10）](#friends)
 - [成绩（4）](#grades)
+- [health-profile（2）](#health-profile)
 - [首页（1）](#home)
 - [医院对接（14）](#hospital)
 - [关联信息（6）](#links)
 - [商城（18）](#mall)
-- [mall-cart-coupon（7）](#mall-cart-coupon)
 - [资料（3）](#materials)
+- [medication（8）](#medication)
 - [通知公告（4）](#notices)
-- [站内通知（4）](#notifications)
+- [站内通知（9）](#notifications)
 - [提醒（6）](#reminders)
 - [课表与校历（7）](#schedule)
 - [服务商品（6）](#service-products)
@@ -93,28 +94,6 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.user_id`（integer，必填）；`path.service_id`（integer，必填）
   - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-
-## agreements
-
-<a id="agreements"></a>
-
-- `GET /api/agreements` — List Agreements
-  - 说明：协议目录（不含全文，全文走详情接口）。
-  - 认证：公开
-  - 响应：`200` array<AgreementOut>（Successful Response）
-- `GET /api/agreements/{agreement_type}` — Get Agreement Detail
-  - 说明：协议全文（Markdown 文本），登录页可直接访问。
-  - 认证：公开
-  - 参数：`path.agreement_type`（string，必填）
-  - 响应：`200` AgreementOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `POST /api/consent` — Accept Agreement
-  - 说明：记录一条同意；重复同意同一版本保持幂等，返回已有记录。
-  - 认证：需要登录
-  - 请求体：`application/json` ConsentCreate（必填）
-  - 响应：`200` ConsentOut（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `GET /api/consents/me` — My Consents
-  - 认证：需要登录
-  - 响应：`200` ConsentStatusOut（Successful Response）
 
 ## AI 用药检测
 
@@ -285,6 +264,64 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.course_id`（integer，必填）
   - 响应：`200` CoursePurchaseOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/courses/{course_id}/quiz` — Get Quiz
+  - 说明：获取某门课的测验题（不返回答案）。
+  - 认证：需要登录
+  - 参数：`path.course_id`（integer，必填）
+  - 响应：`200` array<QuizQuestionOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/courses/{course_id}/quiz` — Submit Quiz
+  - 说明：提交答案：后端判分、返回对错与解析，并保存一次作答记录。
+  - 认证：需要登录
+  - 参数：`path.course_id`（integer，必填）
+  - 请求体：`application/json` QuizSubmitIn（必填）
+  - 响应：`200` QuizResultOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/courses/{course_id}/renew` — Renew Course
+  - 说明：续期：在剩余有效期上叠加一个售卖周期（默认 730 天 = 2 年）。 仅在「已开通且按有效期售卖（source=purchase）」时可用； 长期有效（管理员开通/演示）与整包带入的访问权不支持续期。
+  - 认证：需要登录
+  - 参数：`path.course_id`（integer，必填）
+  - 响应：`200` CoursePurchaseOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/lesson-quiz` — Lesson Quiz Map
+  - 说明：每节课后的小自测题（一节一题，即时判分，不做成绩记录）。
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+
+## followups
+
+<a id="followups"></a>
+
+- `GET /api/followups` — List Plans
+  - 认证：需要登录
+  - 参数：`query.include_closed`（boolean，可选）
+  - 响应：`200` array<FollowUpPlanOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/followups` — Create Plan
+  - 认证：需要登录
+  - 请求体：`application/json` FollowUpPlanIn（必填）
+  - 响应：`200` FollowUpPlanOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/followups/disclaimer` — Disclaimer
+  - 认证：公开
+  - 响应：`200` -（Successful Response）
+- `GET /api/followups/summary` — Summary
+  - 认证：需要登录
+  - 响应：`200` FollowUpSummaryOut（Successful Response）
+- `PATCH /api/followups/{plan_id}` — Update Plan
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 请求体：`application/json` FollowUpPlanUpdate（必填）
+  - 响应：`200` FollowUpPlanOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `DELETE /api/followups/{plan_id}` — Delete Plan
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/followups/{plan_id}/complete` — Complete Visit
+  - 说明：完成一次随访：记录结果，并按周期排下一次。
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 请求体：`application/json` FollowUpCompleteIn（必填）
+  - 响应：`200` FollowUpPlanOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/followups/{plan_id}/visits` — List Visits
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 响应：`200` array<FollowUpVisitOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
 
 ## 好友与消息
 
@@ -350,6 +387,19 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.grade_id`（integer，必填）
   - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+
+## health-profile
+
+<a id="health-profile"></a>
+
+- `GET /api/health-profile` — Read Profile
+  - 认证：需要登录
+  - 参数：`query.user_id`（integer | null，可选）
+  - 响应：`200` HealthProfileOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `PUT /api/health-profile` — Save Profile
+  - 认证：需要登录
+  - 请求体：`application/json` HealthProfileIn（必填）
+  - 响应：`200` HealthProfileOut（Successful Response）；`422` HTTPValidationError（Validation Error）
 
 ## 首页
 
@@ -525,36 +575,6 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 响应：`200` MallSummaryOut（Successful Response）
 
-## mall-cart-coupon
-
-<a id="mall-cart-coupon"></a>
-
-- `GET /api/mall/cart` — Get Cart
-  - 认证：需要登录
-  - 响应：`200` -（Successful Response）
-- `DELETE /api/mall/cart` — Clear Cart
-  - 认证：需要登录
-  - 响应：`200` -（Successful Response）
-- `POST /api/mall/cart/{course_id}` — Add To Cart
-  - 认证：需要登录
-  - 参数：`path.course_id`（integer，必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `DELETE /api/mall/cart/{course_id}` — Remove From Cart
-  - 认证：需要登录
-  - 参数：`path.course_id`（integer，必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `POST /api/mall/checkout` — Checkout Cart
-  - 认证：需要登录
-  - 请求体：`application/json` CheckoutIn（必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-- `GET /api/mall/coupons` — List Coupons
-  - 认证：需要登录
-  - 响应：`200` -（Successful Response）
-- `POST /api/mall/coupons/claim` — Claim Coupon
-  - 认证：需要登录
-  - 请求体：`application/json` ClaimIn（必填）
-  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
-
 ## 资料
 
 <a id="materials"></a>
@@ -571,6 +591,46 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`path.material_id`（integer，必填）
   - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+
+## medication
+
+<a id="medication"></a>
+
+- `GET /api/medication/adherence` — Adherence
+  - 说明：近 N 天依从率：应服次数按计划推算，与是否打开应用无关。
+  - 认证：需要登录
+  - 参数：`query.days`（integer，可选）
+  - 响应：`200` MedicationAdherenceOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/medication/checkin` — Check In
+  - 说明：打卡；status=pending 表示撤销本次打卡。
+  - 认证：需要登录
+  - 请求体：`application/json` MedicationCheckInIn（必填）
+  - 响应：`200` MedicationSlotOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/medication/logs` — List Logs
+  - 认证：需要登录
+  - 参数：`query.days`（integer，可选）；`query.plan_id`（integer | null，可选）
+  - 响应：`200` array<MedicationLogOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/medication/plans` — List Plans
+  - 认证：需要登录
+  - 参数：`query.include_archived`（boolean，可选）
+  - 响应：`200` array<MedicationPlanOut>（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/medication/plans` — Create Plan
+  - 认证：需要登录
+  - 请求体：`application/json` MedicationPlanIn（必填）
+  - 响应：`200` MedicationPlanOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `PATCH /api/medication/plans/{plan_id}` — Update Plan
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 请求体：`application/json` MedicationPlanUpdate（必填）
+  - 响应：`200` MedicationPlanOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `DELETE /api/medication/plans/{plan_id}` — Delete Plan
+  - 认证：需要登录
+  - 参数：`path.plan_id`（integer，必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/medication/today` — Today Slots
+  - 说明：今日待打卡清单；当天槽位按需自动补齐。
+  - 认证：需要登录
+  - 响应：`200` MedicationTodayOut（Successful Response）
 
 ## 通知公告
 
@@ -600,6 +660,24 @@ Authorization: Bearer <access_token>
   - 认证：需要登录
   - 参数：`query.unread_only`（boolean，可选）；`query.page`（integer，可选）；`query.page_size`（integer，可选）
   - 响应：`200` NotificationListOut（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `GET /api/notifications/push/config` — Push Config
+  - 说明：前端订阅所需的公开配置；私钥永远不出服务端。
+  - 认证：公开
+  - 响应：`200` -（Successful Response）
+- `GET /api/notifications/push/status` — Push Status
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+- `POST /api/notifications/push/subscribe` — Push Subscribe
+  - 认证：需要登录
+  - 请求体：`application/json` PushSubscriptionIn（必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
+- `POST /api/notifications/push/test` — Push Test
+  - 认证：需要登录
+  - 响应：`200` -（Successful Response）
+- `POST /api/notifications/push/unsubscribe` — Push Unsubscribe
+  - 认证：需要登录
+  - 请求体：`application/json` PushUnsubscribeIn（必填）
+  - 响应：`200` -（Successful Response）；`422` HTTPValidationError（Validation Error）
 - `POST /api/notifications/read-all` — Read All
   - 认证：需要登录
   - 响应：`200` -（Successful Response）
@@ -793,19 +871,6 @@ Authorization: Bearer <access_token>
 | `full_name` | string | null | 否 | Full Name |
 | `new_password` | string | null | 否 | New Password |
 
-### AgreementOut
-
-协议元信息；content 仅在详情接口返回，列表接口为空以减小响应体。
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `agreement_type` | string | 是 | Agreement Type |
-| `title` | string | 是 | Title |
-| `version` | string | 是 | Version |
-| `effective_date` | string | 是 | Effective Date |
-| `summary` | string | 否 | Summary |
-| `content` | string | null | 否 | Content |
-
 ### AvatarPreviewOut
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -819,6 +884,7 @@ Authorization: Bearer <access_token>
 |------|------|------|------|
 | `file` | string (binary) | 是 | File |
 | `lesson_id` | integer | null | 否 | Lesson Id |
+| `mode` | string | 否 | Mode；默认 `oral` |
 
 ### Body_upload_avatar_api_auth_avatar_post
 
@@ -856,18 +922,6 @@ Authorization: Bearer <access_token>
 | `title` | string | 是 | Title |
 | `event_date` | string (date) | 是 | Event Date |
 | `description` | string | 是 | Description |
-
-### CheckoutIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `coupon_code` | string | null | 否 | Coupon Code |
-
-### ClaimIn
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `code` | string | 是 | Code |
 
 ### CommunityCommentCreate
 
@@ -928,30 +982,6 @@ Authorization: Bearer <access_token>
 |------|------|------|------|
 | `content` | string | 否 | Content |
 
-### ConsentCreate
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `agreement_type` | string | 是 | Agreement Type |
-| `version` | string | null | 否 | Version |
-
-### ConsentOut
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `agreement_type` | string | 是 | Agreement Type |
-| `version` | string | 是 | Version |
-| `accepted_at` | string (date-time) | 是 | Accepted At |
-
-### ConsentStatusOut
-
-当前用户全部同意记录 + 尚未同意的现行版本协议类型。
-
-| 字段 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `consents` | array<ConsentOut> | 否 | Consents |
-| `pending` | array<string> | 否 | Pending |
-
 ### CourseCreate
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -970,6 +1000,8 @@ Authorization: Bearer <access_token>
 | `sort_order` | integer | 否 | Sort Order；默认 `0` |
 | `valid_days` | integer | 否 | Valid Days；默认 `730` |
 | `trial_lesson_count` | integer | 否 | Trial Lesson Count；默认 `1` |
+| `category` | string | 否 | Category |
+| `audience` | string | 否 | Audience |
 
 ### CourseLessonsOut
 
@@ -1006,8 +1038,13 @@ Authorization: Bearer <access_token>
 | `sort_order` | integer | 否 | Sort Order；默认 `0` |
 | `valid_days` | integer | 否 | Valid Days；默认 `730` |
 | `trial_lesson_count` | integer | 否 | Trial Lesson Count；默认 `1` |
+| `category` | string | 否 | Category |
+| `audience` | string | 否 | Audience |
 | `lesson_count` | integer | 否 | Lesson Count；默认 `0` |
 | `expires_at` | string | null | 否 | Expires At |
+| `days_left` | integer | null | 否 | Days Left |
+| `expiring_soon` | boolean | 否 | Expiring Soon；默认 `False` |
+| `expired` | boolean | 否 | Expired；默认 `False` |
 
 ### CourseProgressOut
 
@@ -1067,6 +1104,8 @@ Authorization: Bearer <access_token>
 | `sort_order` | integer | null | 否 | Sort Order |
 | `valid_days` | integer | null | 否 | Valid Days |
 | `trial_lesson_count` | integer | null | 否 | Trial Lesson Count |
+| `category` | string | null | 否 | Category |
+| `audience` | string | null | 否 | Audience |
 
 ### EnrollmentCreate
 
@@ -1093,6 +1132,87 @@ Authorization: Bearer <access_token>
 | `relation` | string | 是 | Relation |
 | `phone` | string | 否 | Phone |
 | `note` | string | 否 | Note |
+| `created_at` | string (date-time) | 是 | Created At |
+
+### FollowUpCompleteIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `visit_date` | string | null | 否 | Visit Date |
+| `result` | string | 否 | Result |
+| `interval_days` | integer | null | 否 | Interval Days |
+
+### FollowUpPlanIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | string | 是 | Title |
+| `follow_type` | string | 否 | Follow Type；默认 `outpatient` |
+| `interval_days` | integer | 否 | Interval Days；默认 `90` |
+| `next_due_date` | string | null | 否 | Next Due Date |
+| `last_visit_date` | string | null | 否 | Last Visit Date |
+| `hospital` | string | 否 | Hospital |
+| `doctor` | string | 否 | Doctor |
+| `note` | string | 否 | Note |
+
+### FollowUpPlanOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `user_id` | integer | 是 | User Id |
+| `title` | string | 是 | Title |
+| `follow_type` | string | 否 | Follow Type；默认 `outpatient` |
+| `follow_type_label` | string | 否 | Follow Type Label |
+| `interval_days` | integer | 否 | Interval Days；默认 `90` |
+| `last_visit_date` | string | null | 否 | Last Visit Date |
+| `next_due_date` | string (date) | 是 | Next Due Date |
+| `hospital` | string | 否 | Hospital |
+| `doctor` | string | 否 | Doctor |
+| `status` | string | 否 | Status；默认 `active` |
+| `note` | string | 否 | Note |
+| `state` | string | 否 | State；默认 `upcoming` |
+| `days_remaining` | integer | 否 | Days Remaining；默认 `0` |
+| `visit_count` | integer | 否 | Visit Count；默认 `0` |
+| `created_at` | string (date-time) | 是 | Created At |
+| `updated_at` | string (date-time) | 是 | Updated At |
+
+### FollowUpPlanUpdate
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `title` | string | null | 否 | Title |
+| `follow_type` | string | null | 否 | Follow Type |
+| `interval_days` | integer | null | 否 | Interval Days |
+| `next_due_date` | string | null | 否 | Next Due Date |
+| `hospital` | string | null | 否 | Hospital |
+| `doctor` | string | null | 否 | Doctor |
+| `status` | string | null | 否 | Status |
+| `note` | string | null | 否 | Note |
+
+### FollowUpSummaryOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `active` | integer | 否 | Active；默认 `0` |
+| `overdue` | integer | 否 | Overdue；默认 `0` |
+| `due_soon` | integer | 否 | Due Soon；默认 `0` |
+| `upcoming` | integer | 否 | Upcoming；默认 `0` |
+| `closed` | integer | 否 | Closed；默认 `0` |
+| `visit_count` | integer | 否 | Visit Count；默认 `0` |
+| `next_due_date` | string | null | 否 | Next Due Date |
+| `next_title` | string | 否 | Next Title |
+| `disclaimer` | string | 否 | Disclaimer；默认 `随访提醒按用户填写的周期推算，不替代医生给出的复诊安排；如症状明显加重请提前就诊，不必等到随访日。` |
+
+### FollowUpVisitOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `plan_id` | integer | 是 | Plan Id |
+| `visit_date` | string (date) | 是 | Visit Date |
+| `result` | string | 否 | Result |
+| `next_due_date` | string (date) | 是 | Next Due Date |
 | `created_at` | string (date-time) | 是 | Created At |
 
 ### FriendMessageCreate
@@ -1207,6 +1327,68 @@ Authorization: Bearer <access_token>
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `detail` | array<ValidationError> | 否 | Detail |
+
+### HealthProfileIn
+
+个人健康档案写入：全部可选，允许只填一部分后逐步补全。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `sex` | string | 否 | Sex |
+| `birth_year` | string | 否 | Birth Year |
+| `height_cm` | string | 否 | Height Cm |
+| `weight_kg` | string | 否 | Weight Kg |
+| `blood_type` | string | 否 | Blood Type |
+| `diagnosis` | string | 否 | Diagnosis |
+| `diagnosed_at` | string | 否 | Diagnosed At |
+| `copd_grade` | string | 否 | Copd Grade |
+| `fev1_percent` | string | 否 | Fev1 Percent |
+| `fev1_fvc` | string | 否 | Fev1 Fvc |
+| `oxygen_target` | string | 否 | Oxygen Target |
+| `current_meds` | string | 否 | Current Meds |
+| `allergies` | string | 否 | Allergies |
+| `past_history` | string | 否 | Past History |
+| `emergency_name` | string | 否 | Emergency Name |
+| `emergency_relation` | string | 否 | Emergency Relation |
+| `emergency_phone` | string | 否 | Emergency Phone |
+| `doctor_name` | string | 否 | Doctor Name |
+| `doctor_hospital` | string | 否 | Doctor Hospital |
+| `doctor_dept` | string | 否 | Doctor Dept |
+| `doctor_phone` | string | 否 | Doctor Phone |
+| `notes` | string | 否 | Notes |
+
+### HealthProfileOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `sex` | string | 否 | Sex |
+| `birth_year` | string | 否 | Birth Year |
+| `height_cm` | string | 否 | Height Cm |
+| `weight_kg` | string | 否 | Weight Kg |
+| `blood_type` | string | 否 | Blood Type |
+| `diagnosis` | string | 否 | Diagnosis |
+| `diagnosed_at` | string | 否 | Diagnosed At |
+| `copd_grade` | string | 否 | Copd Grade |
+| `fev1_percent` | string | 否 | Fev1 Percent |
+| `fev1_fvc` | string | 否 | Fev1 Fvc |
+| `oxygen_target` | string | 否 | Oxygen Target |
+| `current_meds` | string | 否 | Current Meds |
+| `allergies` | string | 否 | Allergies |
+| `past_history` | string | 否 | Past History |
+| `emergency_name` | string | 否 | Emergency Name |
+| `emergency_relation` | string | 否 | Emergency Relation |
+| `emergency_phone` | string | 否 | Emergency Phone |
+| `doctor_name` | string | 否 | Doctor Name |
+| `doctor_hospital` | string | 否 | Doctor Hospital |
+| `doctor_dept` | string | 否 | Doctor Dept |
+| `doctor_phone` | string | 否 | Doctor Phone |
+| `notes` | string | 否 | Notes |
+| `id` | integer | 否 | Id；默认 `0` |
+| `full_name` | string | 否 | Full Name |
+| `username` | string | 否 | Username |
+| `updated_at` | string | null | 否 | Updated At |
+| `completeness` | integer | 否 | Completeness；默认 `0` |
+| `missing` | array<string> | 否 | Missing |
 
 ### HomeOut
 
@@ -1640,6 +1822,34 @@ Authorization: Bearer <access_token>
 | `created_at` | string (date-time) | 是 | Created At |
 | `can_delete` | boolean | 否 | Can Delete；默认 `False` |
 
+### MedicationAdherenceOut
+
+近 N 天依从率：按「应服次数」而不是已打卡天数统计。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `days` | integer | 否 | Days；默认 `30` |
+| `from_date` | string (date) | 是 | From Date |
+| `to_date` | string (date) | 是 | To Date |
+| `scheduled` | integer | 否 | Scheduled；默认 `0` |
+| `taken` | integer | 否 | Taken；默认 `0` |
+| `skipped` | integer | 否 | Skipped；默认 `0` |
+| `missed` | integer | 否 | Missed；默认 `0` |
+| `rate` | number | 否 | Rate；默认 `0.0` |
+| `streak_days` | integer | 否 | Streak Days；默认 `0` |
+| `plan_count` | integer | 否 | Plan Count；默认 `0` |
+| `disclaimer` | string | 否 | Disclaimer；默认 `用药打卡仅用于自我记录与复诊时回顾，不构成诊断或用药建议；如漏服或出现不适，请按医嘱处理或咨询医生。` |
+
+### MedicationCheckInIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `plan_id` | integer | 是 | Plan Id |
+| `take_date` | string | null | 否 | Take Date |
+| `slot` | integer | 否 | Slot；默认 `1` |
+| `status` | string | 否 | Status；默认 `taken` |
+| `note` | string | 否 | Note |
+
 ### MedicationCheckListOut
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -1660,6 +1870,7 @@ Authorization: Bearer <access_token>
 | `lesson_id` | integer | null | 否 | Lesson Id |
 | `status` | string | 否 | Status；默认 `completed` |
 | `provider` | string | 否 | Provider；默认 `demo` |
+| `mode` | string | 否 | Mode；默认 `oral` |
 | `steps` | array<MedicationStepOut> | 否 | Steps |
 | `needs_retry` | boolean | 否 | Needs Retry；默认 `False` |
 | `message` | string | 否 | Message |
@@ -1668,6 +1879,93 @@ Authorization: Bearer <access_token>
 | `created_at` | string (date-time) | 是 | Created At |
 | `expires_at` | string | null | 否 | Expires At |
 | `disclaimer` | string | 否 | Disclaimer |
+
+### MedicationLogOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `plan_id` | integer | 是 | Plan Id |
+| `drug_name` | string | 否 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `take_date` | string (date) | 是 | Take Date |
+| `slot` | integer | 否 | Slot；默认 `1` |
+| `scheduled_time` | string | 否 | Scheduled Time |
+| `status` | string | 否 | Status；默认 `pending` |
+| `checked_at` | string | null | 否 | Checked At |
+| `note` | string | 否 | Note |
+
+### MedicationPlanIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `drug_name` | string | 是 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `frequency` | integer | 否 | Frequency；默认 `1` |
+| `times` | string | 否 | Times |
+| `start_date` | string | null | 否 | Start Date |
+| `end_date` | string | null | 否 | End Date |
+| `note` | string | 否 | Note |
+
+### MedicationPlanOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `user_id` | integer | 是 | User Id |
+| `drug_name` | string | 是 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `frequency` | integer | 否 | Frequency；默认 `1` |
+| `times` | string | 否 | Times |
+| `start_date` | string (date) | 是 | Start Date |
+| `end_date` | string | null | 否 | End Date |
+| `status` | string | 否 | Status；默认 `active` |
+| `note` | string | 否 | Note |
+| `created_at` | string (date-time) | 是 | Created At |
+| `updated_at` | string (date-time) | 是 | Updated At |
+
+### MedicationPlanUpdate
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `drug_name` | string | null | 否 | Drug Name |
+| `dosage` | string | null | 否 | Dosage |
+| `frequency` | integer | null | 否 | Frequency |
+| `times` | string | null | 否 | Times |
+| `start_date` | string | null | 否 | Start Date |
+| `end_date` | string | null | 否 | End Date |
+| `clear_end_date` | boolean | 否 | Clear End Date；默认 `False` |
+| `status` | string | null | 否 | Status |
+| `note` | string | null | 否 | Note |
+
+### MedicationSlotOut
+
+今日待打卡的一项：某个计划当天第 N 次。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `log_id` | integer | 否 | Log Id；默认 `0` |
+| `plan_id` | integer | 是 | Plan Id |
+| `drug_name` | string | 是 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `take_date` | string (date) | 是 | Take Date |
+| `slot` | integer | 否 | Slot；默认 `1` |
+| `scheduled_time` | string | 否 | Scheduled Time |
+| `status` | string | 否 | Status；默认 `pending` |
+| `checked_at` | string | null | 否 | Checked At |
+| `note` | string | 否 | Note |
+
+### MedicationTodayOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `date` | string (date) | 是 | Date |
+| `items` | array<MedicationSlotOut> | 否 | Items |
+| `total` | integer | 否 | Total；默认 `0` |
+| `taken` | integer | 否 | Taken；默认 `0` |
+| `pending` | integer | 否 | Pending；默认 `0` |
+| `skipped` | integer | 否 | Skipped；默认 `0` |
+| `disclaimer` | string | 否 | Disclaimer；默认 `用药打卡仅用于自我记录与复诊时回顾，不构成诊断或用药建议；如漏服或出现不适，请按医嘱处理或咨询医生。` |
 
 ### NoticeCreate
 
@@ -1718,6 +2016,7 @@ Authorization: Bearer <access_token>
 | `created_at` | string (date-time) | 是 | Created At |
 | `read_at` | string | null | 否 | Read At |
 | `read` | boolean | 否 | Read；默认 `False` |
+| `click_url` | string | 否 | Click Url |
 
 ### ProfileUpdate
 
@@ -1726,6 +2025,45 @@ Authorization: Bearer <access_token>
 | `full_name` | string | null | 否 | Full Name |
 | `old_password` | string | null | 否 | Old Password |
 | `new_password` | string | null | 否 | New Password |
+
+### PushSubscriptionIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `endpoint` | string | 是 | Endpoint |
+| `keys` | PushSubscriptionKeysIn | 是 |  |
+| `user_agent` | string | 否 | User Agent |
+
+### PushUnsubscribeIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `endpoint` | string | 是 | Endpoint |
+
+### QuizQuestionOut
+
+下发给前端的题目：不带答案，防作弊。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `id` | integer | 是 | Id |
+| `question` | string | 是 | Question |
+| `options` | array<string> | 否 | Options |
+
+### QuizResultOut
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `course_id` | integer | 是 | Course Id |
+| `score` | integer | 是 | Score |
+| `total` | integer | 是 | Total |
+| `details` | array<QuizDetailOut> | 否 | Details |
+
+### QuizSubmitIn
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `answers` | object | 否 | Answers |
 
 ### ReminderCreate
 
@@ -1736,6 +2074,12 @@ Authorization: Bearer <access_token>
 | `due_at` | string (date-time) | 是 | Due At |
 | `external_url` | string | 否 | External Url |
 | `course_id` | integer | null | 否 | Course Id |
+| `kind` | string | 否 | Kind；默认 `general` |
+| `drug_name` | string | 否 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `repeat_rule` | string | 否 | Repeat Rule；默认 `none` |
+| `check_type` | string | 否 | Check Type |
+| `prep_questions` | string | 否 | Prep Questions |
 
 ### ReminderDoneUpdate
 
@@ -1770,6 +2114,13 @@ Authorization: Bearer <access_token>
 | `completed_at` | string | null | 否 | Completed At |
 | `can_delete` | boolean | 否 | Can Delete；默认 `False` |
 | `can_edit` | boolean | 否 | Can Edit；默认 `False` |
+| `kind` | string | 否 | Kind；默认 `general` |
+| `drug_name` | string | 否 | Drug Name |
+| `dosage` | string | 否 | Dosage |
+| `repeat_rule` | string | 否 | Repeat Rule；默认 `none` |
+| `check_type` | string | 否 | Check Type |
+| `prep_questions` | string | 否 | Prep Questions |
+| `recurring_parent_id` | integer | null | 否 | Recurring Parent Id |
 
 ### ReminderUpdate
 
@@ -1780,6 +2131,12 @@ Authorization: Bearer <access_token>
 | `due_at` | string | null | 否 | Due At |
 | `external_url` | string | null | 否 | External Url |
 | `course_id` | integer | null | 否 | Course Id |
+| `kind` | string | null | 否 | Kind |
+| `drug_name` | string | null | 否 | Drug Name |
+| `dosage` | string | null | 否 | Dosage |
+| `repeat_rule` | string | null | 否 | Repeat Rule |
+| `check_type` | string | null | 否 | Check Type |
+| `prep_questions` | string | null | 否 | Prep Questions |
 
 ### ScheduleSlotCreate
 
@@ -1905,9 +2262,9 @@ Authorization: Bearer <access_token>
 |------|------|------|------|
 | `id` | integer | 是 | Id |
 | `record_date` | string (date) | 是 | Record Date |
-| `cough` | integer | 是 | Cough |
-| `dyspnea` | integer | 是 | Dyspnea |
-| `sputum` | integer | 是 | Sputum |
+| `cough` | integer | 否 | Cough；默认 `0` |
+| `dyspnea` | integer | 否 | Dyspnea；默认 `0` |
+| `sputum` | integer | 否 | Sputum；默认 `0` |
 | `note` | string | 否 | Note |
 | `total` | integer | 否 | Total；默认 `0` |
 | `warning` | boolean | 否 | Warning；默认 `False` |

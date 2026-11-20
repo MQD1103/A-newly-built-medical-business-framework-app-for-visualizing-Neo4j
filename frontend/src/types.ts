@@ -28,9 +28,26 @@ export interface Course {
   description: string
   price: number
   cover_url?: string
-  /** 课程分类：intro 入门课 / single 单课 / bundle 整包课 */
-  course_type?: string
   enrolled?: boolean
+  /** 商城字段：课程类型（single / bundle）、路径标签、副标题 */
+  course_type?: string
+  path_label?: string
+  tagline?: string
+  lesson_count?: number
+  /** 用途分类（商城目录侧栏），如「入门与自测」 */
+  category?: string
+  /** 适用人群，如「新确诊患者」 */
+  audience?: string
+  /** 学习权有效期（天）：730 = 2 年；0 = 长期有效 */
+  valid_days?: number
+  /** 学习权到期时间（ISO）；为空且 enrolled=true 表示长期有效 */
+  expires_at?: string | null
+  /** 剩余天数（后端算好，向上取整）；为空表示长期有效或未开通 */
+  days_left?: number | null
+  /** 剩余 ≤ 30 天，提示「即将到期」 */
+  expiring_soon?: boolean
+  /** 曾经开通过但已过期，可续期 */
+  expired?: boolean
 }
 
 export interface Lesson {
@@ -69,6 +86,17 @@ export interface ServiceProduct {
   owned?: boolean
 }
 
+export type ReminderKind =
+  | 'general'
+  | 'medication'
+  | 'oxygen'
+  | 'rehab'
+  | 'vitals'
+  | 'checkup'
+  | 'assessment'
+  | 'vaccine'
+export type RepeatRule = 'none' | 'daily' | 'weekly'
+
 export interface Reminder {
   id: number
   course_id: number | null
@@ -86,6 +114,15 @@ export interface Reminder {
   notify_enabled?: boolean
   can_delete?: boolean
   can_edit?: boolean
+  completed?: boolean
+  completed_at?: string | null
+  kind: ReminderKind
+  drug_name: string
+  dosage: string
+  repeat_rule: RepeatRule
+  check_type: string
+  prep_questions: string
+  recurring_parent_id?: number | null
 }
 
 export interface ScheduleSlot {
@@ -194,26 +231,192 @@ export interface FriendActionResult {
   auto_accepted: boolean
 }
 
-export interface AgreementInfo {
-  agreement_type: string
+// ---------- 商城订单 / 我的课程（routers/mall.py）----------
+
+export interface MallMyCourse {
+  course: Course & { expires_at?: string | null }
+  source: string
+  expires_at: string | null
+  total_lessons: number
+  completed_lessons: number
+  progress_percent: number
+}
+
+export type MallOrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'cancelled'
+  | 'refund_pending'
+  | 'refunded'
+  | 'partially_refunded'
+  | string
+
+export interface MallOrderSeat {
+  id: number
+  learner_user_id: number | null
+  learner_name: string
+  learner_phone: string
+  activation_code: string
+  status: string
+  activated_at: string | null
+  refund_amount: number
+  refunded_at: string | null
+}
+
+export interface MallOrder {
+  id: number
+  order_no: string
+  product_type: 'course' | 'service'
+  product_id: number
+  product_name: string
+  product_cover: string
+  product_category: string
+  quantity: number
+  unit_price: number
+  original_amount: number
+  discount_amount: number
+  amount: number
+  status: MallOrderStatus
+  channel: string
+  order_type: string
+  transaction_id: string
+  buyer_id: number
+  buyer_name: string
+  created_at: string
+  expires_at: string | null
+  paid_at: string | null
+  valid_until: string | null
+  cancelled_at: string | null
+  refunded_at: string | null
+  refund_amount: number
+  refund_reason: string
+  upgrade_from_order_id: number | null
+  upgrade_source_order_nos: string[]
+  seats: MallOrderSeat[]
+  can_pay: boolean
+  can_cancel: boolean
+  refundable: boolean
+  refund_hint: string
+}
+
+export interface MallOrderList {
+  items: MallOrder[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface MallRefundCheck {
+  eligible: boolean
+  reason: string
+  refund_amount: number
+  within_window: boolean
+  window_ends_at: string | null
+  progress_percent: number
+  policy: string
+}
+
+export interface MallRefundPolicy {
+  policy: string
+  window_days: number
+  progress_limit: number
+  order_ttl_minutes: number
+  auto_refund: boolean
+}
+
+// ---------- 医院资料（routers/hospital.py）----------
+
+export interface HospitalPartner {
+  id: number
+  code: string
+  name: string
+  department: string
+  status: string
+  mode: string
+  contact: string
+  note: string
+}
+
+export interface HospitalAuthorization {
+  id: number
+  partner_id: number
+  partner_name: string
+  patient_ref_masked: string
+  scopes: string[]
+  status: 'active' | 'expired' | 'revoked' | string
+  authorized_at: string
+  expires_at: string | null
+  revoked_at: string | null
+}
+
+export type HospitalRecordType = 'advice' | 'condition' | 'record'
+
+export interface HospitalRecord {
+  id: number
+  partner_id: number
+  partner_name: string
+  record_type: HospitalRecordType
   title: string
-  version: string
-  effective_date: string
-  summary: string
-  content: string | null
+  content: string
+  doctor_name: string
+  department: string
+  occurred_at: string | null
+  fetched_at: string
 }
 
-export interface ConsentRecord {
-  agreement_type: string
-  version: string
-  accepted_at: string
+export interface HospitalCaregiver {
+  id: number
+  patient_user_id: number
+  patient_name: string
+  caregiver_user_id: number
+  caregiver_name: string
+  relation: string
+  status: 'active' | 'revoked' | string
+  granted_at: string
+  revoked_at: string | null
 }
 
-export interface ConsentStatus {
-  consents: ConsentRecord[]
-  /** 尚未同意的现行版本协议类型；非空时前端应弹出确认弹窗 */
-  pending: string[]
+export interface HospitalCaregivers {
+  granted: HospitalCaregiver[]
+  received: HospitalCaregiver[]
 }
+
+// ---------- AI 用药动作检测（routers/ai.py）----------
+
+export type MedicationMode = 'oral' | 'inhale'
+
+export interface MedicationStep {
+  name: string
+  done: boolean
+}
+
+export interface MedicationCheck {
+  id: number
+  user_id: number
+  lesson_id: number | null
+  status: string
+  provider: string
+  mode: MedicationMode
+  steps: MedicationStep[]
+  needs_retry: boolean
+  message: string
+  image_size: number
+  image_type: string
+  created_at: string
+  expires_at: string | null
+  disclaimer: string
+}
+
+export interface MedicationCheckList {
+  items: MedicationCheck[]
+  total: number
+  page: number
+  page_size: number
+  retention_days: number
+  disclaimer: string
+}
+
+// ---------- 症状日记（routers/symptoms.py）----------
 
 export interface SymptomEntry {
   id: number
@@ -234,4 +437,204 @@ export interface SymptomDiary {
   warning: boolean
   warning_text: string
   disclaimer: string
+}
+
+// ---------- 用药打卡（routers/medication.py）----------
+
+export interface MedicationPlan {
+  id: number
+  user_id: number
+  drug_name: string
+  dosage: string
+  frequency: number
+  times: string
+  start_date: string
+  end_date: string | null
+  /** active=进行中 / paused=已暂停 / archived=已停用 */
+  status: string
+  note: string
+  created_at: string
+  updated_at: string
+}
+
+/** 今日待打卡的一项：某个计划当天第 N 次 */
+export interface MedicationSlot {
+  log_id: number
+  plan_id: number
+  drug_name: string
+  dosage: string
+  take_date: string
+  slot: number
+  scheduled_time: string
+  /** pending=待打卡 / taken=已服用 / skipped=已跳过 */
+  status: string
+  checked_at: string | null
+  note: string
+}
+
+export interface MedicationToday {
+  date: string
+  items: MedicationSlot[]
+  total: number
+  taken: number
+  pending: number
+  skipped: number
+  disclaimer: string
+}
+
+export interface MedicationLog {
+  id: number
+  plan_id: number
+  drug_name: string
+  dosage: string
+  take_date: string
+  slot: number
+  scheduled_time: string
+  status: string
+  checked_at: string | null
+  note: string
+}
+
+export interface MedicationAdherence {
+  days: number
+  from_date: string
+  to_date: string
+  scheduled: number
+  taken: number
+  skipped: number
+  missed: number
+  rate: number
+  streak_days: number
+  plan_count: number
+  disclaimer: string
+}
+
+// ---------- 随访提醒（routers/followups.py）----------
+
+export interface FollowUpPlan {
+  id: number
+  user_id: number
+  title: string
+  follow_type: string
+  follow_type_label: string
+  interval_days: number
+  last_visit_date: string | null
+  next_due_date: string
+  hospital: string
+  doctor: string
+  /** active=进行中 / paused=已暂停 / closed=已结束 */
+  status: string
+  note: string
+  /** overdue=已逾期 / due_soon=7 天内 / upcoming=未到期 / closed=已结束 */
+  state: string
+  /** 距下次随访天数，负数表示已逾期 */
+  days_remaining: number
+  visit_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FollowUpVisit {
+  id: number
+  plan_id: number
+  visit_date: string
+  result: string
+  next_due_date: string
+  created_at: string
+}
+
+export interface FollowUpSummary {
+  active: number
+  overdue: number
+  due_soon: number
+  upcoming: number
+  closed: number
+  visit_count: number
+  next_due_date: string | null
+  next_title: string
+  disclaimer: string
+}
+
+// ---------- 消息通知与手机推送（routers/notifications.py）----------
+
+export interface AppNotification {
+  id: number
+  user_id: number
+  reminder_id: number
+  course_id: number | null
+  course_name: string
+  trigger_key: string
+  title: string
+  body: string
+  external_url: string
+  due_at: string | null
+  created_at: string
+  read_at: string | null
+  read: boolean
+  click_url: string
+}
+
+export interface NotificationList {
+  items: AppNotification[]
+  total: number
+  unread: number
+  page: number
+  page_size: number
+}
+
+export interface PushConfig {
+  enabled: boolean
+  public_key: string
+  subject: string
+  reason: string
+}
+
+export interface PushStatus {
+  enabled: boolean
+  reason: string
+  subscriptions: number
+  last_success_at: string | null
+}
+
+export interface PushTestResult {
+  ok: boolean
+  sent: number
+  failed: number
+  total: number
+  detail: string
+}
+
+/** 个人健康档案（与后端 /api/health-profile 对应） */
+export interface HealthProfile {
+  sex: string
+  birth_year: string
+  height_cm: string
+  weight_kg: string
+  blood_type: string
+  diagnosis: string
+  diagnosed_at: string
+  copd_grade: string
+  fev1_percent: string
+  fev1_fvc: string
+  oxygen_target: string
+  current_meds: string
+  allergies: string
+  past_history: string
+  emergency_name: string
+  emergency_relation: string
+  emergency_phone: string
+  doctor_name: string
+  doctor_hospital: string
+  doctor_dept: string
+  doctor_phone: string
+  notes: string
+}
+
+export interface HealthProfileOut extends HealthProfile {
+  id: number
+  full_name: string
+  username: string
+  updated_at: string | null
+  completeness: number
+  missing: string[]
 }

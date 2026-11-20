@@ -76,6 +76,8 @@ class CourseCreate(BaseModel):
     sort_order: int = 0
     valid_days: int = Field(default=730, ge=0)
     trial_lesson_count: int = Field(default=1, ge=0)
+    category: str = Field(default="", max_length=40)
+    audience: str = Field(default="", max_length=40)
 
 
 class CourseUpdate(BaseModel):
@@ -95,6 +97,8 @@ class CourseUpdate(BaseModel):
     sort_order: int | None = None
     valid_days: int | None = Field(default=None, ge=0)
     trial_lesson_count: int | None = Field(default=None, ge=0)
+    category: str | None = Field(default=None, max_length=40)
+    audience: str | None = Field(default=None, max_length=40)
 
 
 class CourseOut(BaseModel):
@@ -118,9 +122,17 @@ class CourseOut(BaseModel):
     sort_order: int = 0
     valid_days: int = 730
     trial_lesson_count: int = 1
+    category: str = ""
+    audience: str = ""
     lesson_count: int = 0
     # 当前用户的学习权到期时间；为空且 enrolled=True 表示长期有效
     expires_at: datetime | None = None
+    # 学习权剩余天数（向上取整）；为空表示长期有效或未开通
+    days_left: int | None = None
+    # 剩余天数 ≤ 30 天，前端据此提示续期
+    expiring_soon: bool = False
+    # 曾经开通过但已过期：前端显示「已过期·可续期」而不是「未开通」
+    expired: bool = False
 
 
 class EnrollmentCreate(BaseModel):
@@ -236,6 +248,16 @@ class ReminderCreate(BaseModel):
     due_at: datetime
     external_url: str = ""
     course_id: int | None = None
+    # general / medication / oxygen / rehab / vitals / checkup / assessment / vaccine
+    kind: str = Field(
+        default="general",
+        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
+    )
+    drug_name: str = Field(default="", max_length=120)
+    dosage: str = Field(default="", max_length=120)
+    repeat_rule: str = Field(default="none", pattern="^(none|daily|weekly)$")
+    check_type: str = Field(default="", max_length=120)
+    prep_questions: str = Field(default="", max_length=2000)
 
 
 class ReminderUpdate(BaseModel):
@@ -244,6 +266,15 @@ class ReminderUpdate(BaseModel):
     due_at: datetime | None = None
     external_url: str | None = None
     course_id: int | None = None
+    kind: str | None = Field(
+        default=None,
+        pattern="^(general|medication|oxygen|rehab|vitals|checkup|assessment|vaccine)$",
+    )
+    drug_name: str | None = Field(default=None, max_length=120)
+    dosage: str | None = Field(default=None, max_length=120)
+    repeat_rule: str | None = Field(default=None, pattern="^(none|daily|weekly)$")
+    check_type: str | None = Field(default=None, max_length=120)
+    prep_questions: str | None = Field(default=None, max_length=2000)
 
 
 class ReminderNotifyUpdate(BaseModel):
@@ -276,6 +307,14 @@ class ReminderOut(BaseModel):
     completed_at: datetime | None = None
     can_delete: bool = False
     can_edit: bool = False
+    # 服务化提醒字段
+    kind: str = "general"
+    drug_name: str = ""
+    dosage: str = ""
+    repeat_rule: str = "none"
+    check_type: str = ""
+    prep_questions: str = ""
+    recurring_parent_id: int | None = None
 
 
 class NotificationOut(BaseModel):
@@ -292,6 +331,8 @@ class NotificationOut(BaseModel):
     created_at: datetime
     read_at: datetime | None = None
     read: bool = False
+    # 点击通知时打开的前端路径
+    click_url: str = ""
 
 
 class NotificationListOut(BaseModel):
@@ -300,6 +341,21 @@ class NotificationListOut(BaseModel):
     unread: int = 0
     page: int = 1
     page_size: int = 20
+
+
+class PushSubscriptionKeysIn(BaseModel):
+    p256dh: str = Field(min_length=20, max_length=200)
+    auth: str = Field(min_length=8, max_length=100)
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=500)
+    keys: PushSubscriptionKeysIn
+    user_agent: str = Field(default="", max_length=300)
+
+
+class PushUnsubscribeIn(BaseModel):
+    endpoint: str = Field(min_length=10, max_length=500)
 
 
 class ScheduleSlotCreate(BaseModel):
@@ -670,6 +726,41 @@ class CourseProgressOut(BaseModel):
 # ---------- 商城：商品、订单、退款（routers/mall.py）----------
 
 
+# ---------- 板块测验（routers/courses.py）----------
+
+
+class QuizQuestionOut(BaseModel):
+    """下发给前端的题目：不带答案，防作弊。"""
+
+    id: int
+    question: str
+    options: list[str] = Field(default_factory=list)
+
+
+class QuizSubmitIn(BaseModel):
+    # {题目id: 选择的选项下标}
+    answers: dict[int, int] = Field(default_factory=dict)
+
+
+class QuizDetailOut(BaseModel):
+    question_id: int
+    question: str
+    chosen: int
+    answer_index: int
+    correct: bool
+    explanation: str = ""
+    # 错题可回看的课时；题库未关联课时时为空
+    lesson_id: int | None = None
+    lesson_title: str = ""
+
+
+class QuizResultOut(BaseModel):
+    course_id: int
+    score: int
+    total: int
+    details: list[QuizDetailOut] = Field(default_factory=list)
+
+
 class MallIncludedCourseOut(BaseModel):
     id: int
     name: str
@@ -976,6 +1067,8 @@ class MedicationCheckOut(BaseModel):
     lesson_id: int | None = None
     status: str = "completed"
     provider: str = "demo"
+    # oral=口服，inhale=吸入
+    mode: str = "oral"
     steps: list[MedicationStepOut] = Field(default_factory=list)
     needs_retry: bool = False
     message: str = ""
@@ -999,21 +1092,19 @@ class MedicationCheckListOut(BaseModel):
 
 
 class SymptomEntryIn(BaseModel):
-    record_date: date | None = None  # 缺省为今天；不能是未来日期
-    cough: int = Field(ge=0, le=3, default=0)
-    dyspnea: int = Field(ge=0, le=3, default=0)
-    sputum: int = Field(ge=0, le=3, default=0)
+    record_date: date | None = None
+    cough: int = Field(default=0, ge=0, le=3)
+    dyspnea: int = Field(default=0, ge=0, le=3)
+    sputum: int = Field(default=0, ge=0, le=3)
     note: str = Field(default="", max_length=1000)
 
 
 class SymptomEntryOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     record_date: date
-    cough: int
-    dyspnea: int
-    sputum: int
+    cough: int = 0
+    dyspnea: int = 0
+    sputum: int = 0
     note: str = ""
     total: int = 0
     warning: bool = False
@@ -1029,36 +1120,252 @@ class SymptomDiaryOut(BaseModel):
     disclaimer: str = ""
 
 
-# ---------- 用户协议 / 隐私政策 ----------
+class HealthProfileIn(BaseModel):
+    """个人健康档案写入：全部可选，允许只填一部分后逐步补全。"""
+
+    sex: str = Field(default="", max_length=10)
+    birth_year: str = Field(default="", max_length=10)
+    height_cm: str = Field(default="", max_length=10)
+    weight_kg: str = Field(default="", max_length=10)
+    blood_type: str = Field(default="", max_length=10)
+
+    diagnosis: str = Field(default="", max_length=120)
+    diagnosed_at: str = Field(default="", max_length=20)
+    copd_grade: str = Field(default="", max_length=20)
+    fev1_percent: str = Field(default="", max_length=10)
+    fev1_fvc: str = Field(default="", max_length=10)
+    oxygen_target: str = Field(default="", max_length=30)
+
+    current_meds: str = Field(default="", max_length=4000)
+    allergies: str = Field(default="", max_length=2000)
+    past_history: str = Field(default="", max_length=4000)
+
+    emergency_name: str = Field(default="", max_length=60)
+    emergency_relation: str = Field(default="", max_length=30)
+    emergency_phone: str = Field(default="", max_length=40)
+
+    doctor_name: str = Field(default="", max_length=60)
+    doctor_hospital: str = Field(default="", max_length=120)
+    doctor_dept: str = Field(default="", max_length=60)
+    doctor_phone: str = Field(default="", max_length=40)
+
+    notes: str = Field(default="", max_length=2000)
 
 
-class AgreementOut(BaseModel):
-    """协议元信息；content 仅在详情接口返回，列表接口为空以减小响应体。"""
-
-    agreement_type: str
-    title: str
-    version: str
-    effective_date: str
-    summary: str = ""
-    content: str | None = None
-
-
-class ConsentCreate(BaseModel):
-    agreement_type: str
-    # 缺省视为同意当前线上版本
-    version: str | None = None
-
-
-class ConsentOut(BaseModel):
+class HealthProfileOut(HealthProfileIn):
     model_config = ConfigDict(from_attributes=True)
 
-    agreement_type: str
-    version: str
-    accepted_at: datetime
+    id: int = 0
+    full_name: str = ""
+    username: str = ""
+    updated_at: datetime | None = None
+    # 档案完整度（0-100）与缺失项提示，前端用来引导补全
+    completeness: int = 0
+    missing: list[str] = Field(default_factory=list)
 
 
-class ConsentStatusOut(BaseModel):
-    """当前用户全部同意记录 + 尚未同意的现行版本协议类型。"""
+# ---------- 用药打卡 ----------
 
-    consents: list[ConsentOut] = Field(default_factory=list)
-    pending: list[str] = Field(default_factory=list)
+MEDICATION_DISCLAIMER = (
+    "用药打卡仅用于自我记录与复诊时回顾，不构成诊断或用药建议；"
+    "如漏服或出现不适，请按医嘱处理或咨询医生。"
+)
+
+
+class MedicationPlanIn(BaseModel):
+    drug_name: str = Field(min_length=1, max_length=120)
+    dosage: str = Field(default="", max_length=120)
+    frequency: int = Field(default=1, ge=1, le=6)
+    # 逗号分隔的 HH:MM，如 "08:00,20:00"；留空表示不限时间
+    times: str = Field(default="", max_length=200)
+    start_date: date | None = None
+    end_date: date | None = None
+    note: str = Field(default="", max_length=2000)
+
+
+class MedicationPlanUpdate(BaseModel):
+    drug_name: str | None = Field(default=None, min_length=1, max_length=120)
+    dosage: str | None = Field(default=None, max_length=120)
+    frequency: int | None = Field(default=None, ge=1, le=6)
+    times: str | None = Field(default=None, max_length=200)
+    start_date: date | None = None
+    end_date: date | None = None
+    # 可选字段 None 表示「不改」；结束日期需要单独清除
+    clear_end_date: bool = False
+    status: str | None = Field(default=None, max_length=20)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class MedicationPlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    drug_name: str
+    dosage: str = ""
+    frequency: int = 1
+    times: str = ""
+    start_date: date
+    end_date: date | None = None
+    status: str = "active"
+    note: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class MedicationSlotOut(BaseModel):
+    """今日待打卡的一项：某个计划当天第 N 次。"""
+
+    log_id: int = 0
+    plan_id: int
+    drug_name: str
+    dosage: str = ""
+    take_date: date
+    slot: int = 1
+    scheduled_time: str = ""
+    status: str = "pending"
+    checked_at: datetime | None = None
+    note: str = ""
+
+
+class MedicationTodayOut(BaseModel):
+    date: date
+    items: list[MedicationSlotOut] = Field(default_factory=list)
+    total: int = 0
+    taken: int = 0
+    pending: int = 0
+    skipped: int = 0
+    disclaimer: str = MEDICATION_DISCLAIMER
+
+
+class MedicationCheckInIn(BaseModel):
+    plan_id: int
+    take_date: date | None = None
+    slot: int = Field(default=1, ge=1, le=6)
+    # taken=已服用 / skipped=已跳过
+    status: str = Field(default="taken", max_length=20)
+    note: str = Field(default="", max_length=2000)
+
+
+class MedicationLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    plan_id: int
+    drug_name: str = ""
+    dosage: str = ""
+    take_date: date
+    slot: int = 1
+    scheduled_time: str = ""
+    status: str = "pending"
+    checked_at: datetime | None = None
+    note: str = ""
+
+
+class MedicationAdherenceOut(BaseModel):
+    """近 N 天依从率：按「应服次数」而不是已打卡天数统计。"""
+
+    days: int = 30
+    from_date: date
+    to_date: date
+    scheduled: int = 0
+    taken: int = 0
+    skipped: int = 0
+    missed: int = 0
+    rate: float = 0.0
+    streak_days: int = 0
+    plan_count: int = 0
+    disclaimer: str = MEDICATION_DISCLAIMER
+
+
+# ---------- 随访提醒 ----------
+
+FOLLOWUP_DISCLAIMER = (
+    "随访提醒按用户填写的周期推算，不替代医生给出的复诊安排；"
+    "如症状明显加重请提前就诊，不必等到随访日。"
+)
+
+FOLLOWUP_TYPES = {
+    "outpatient": "门诊随访",
+    "lung_function": "肺功能复查",
+    "imaging": "影像复查",
+    "phone": "电话随访",
+    "other": "其他",
+}
+
+
+class FollowUpPlanIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    follow_type: str = Field(default="outpatient", max_length=40)
+    interval_days: int = Field(default=90, ge=7, le=730)
+    # 下次随访到期日；留空则用「今天 + 周期」推算
+    next_due_date: date | None = None
+    last_visit_date: date | None = None
+    hospital: str = Field(default="", max_length=120)
+    doctor: str = Field(default="", max_length=60)
+    note: str = Field(default="", max_length=2000)
+
+
+class FollowUpPlanUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    follow_type: str | None = Field(default=None, max_length=40)
+    interval_days: int | None = Field(default=None, ge=7, le=730)
+    next_due_date: date | None = None
+    hospital: str | None = Field(default=None, max_length=120)
+    doctor: str | None = Field(default=None, max_length=60)
+    status: str | None = Field(default=None, max_length=20)
+    note: str | None = Field(default=None, max_length=2000)
+
+
+class FollowUpVisitOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    plan_id: int
+    visit_date: date
+    result: str = ""
+    next_due_date: date
+    created_at: datetime
+
+
+class FollowUpPlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    title: str
+    follow_type: str = "outpatient"
+    follow_type_label: str = ""
+    interval_days: int = 90
+    last_visit_date: date | None = None
+    next_due_date: date
+    hospital: str = ""
+    doctor: str = ""
+    status: str = "active"
+    note: str = ""
+    # overdue=已逾期 / due_soon=7 天内 / upcoming=未到期 / closed=已结束
+    state: str = "upcoming"
+    # 距下次随访天数，负数表示已逾期
+    days_remaining: int = 0
+    visit_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class FollowUpCompleteIn(BaseModel):
+    visit_date: date | None = None
+    result: str = Field(default="", max_length=2000)
+    # 本次完成后按新周期排下次；留空沿用计划周期
+    interval_days: int | None = Field(default=None, ge=7, le=730)
+
+
+class FollowUpSummaryOut(BaseModel):
+    active: int = 0
+    overdue: int = 0
+    due_soon: int = 0
+    upcoming: int = 0
+    closed: int = 0
+    visit_count: int = 0
+    next_due_date: date | None = None
+    next_title: str = ""
+    disclaimer: str = FOLLOWUP_DISCLAIMER

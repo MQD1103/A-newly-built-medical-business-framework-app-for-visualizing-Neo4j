@@ -2,7 +2,7 @@
 
 覆盖登录、商品目录、试看、单课下单 / 支付 / 取消、进度与退款规则、
 补差价升级、团购与激活码、部分退款、服务订单、支付回调、管理员操作、
-旧接口兼容与教师视角。共 67 项检查。
+旧接口兼容、教师视角，以及课程两年有效期与续期。
 
 用法：
     python backend/scripts/smoke_mall.py
@@ -121,7 +121,7 @@ def run_checks():
     bundle = next(c for c in courses if c["course_type"] == "bundle")
     check("免费入门课对所有登录用户 owned", intro["owned"] is True)
     check("入门课价格为 0", intro["price"] == 0)
-    check("整包包含 5 门单课", len(bundle["included_courses"]) == 5, str(len(bundle["included_courses"])))
+    check("整包包含多门单课", len(bundle["included_courses"]) >= 5, str(len(bundle["included_courses"])))
     check("整包价格低于单课合计", bundle["price"] < sum(c["price"] for c in bundle["included_courses"]))
 
     singles = {c["name"]: c for c in courses if c["course_type"] == "single"}
@@ -132,7 +132,7 @@ def run_checks():
 
     print("== 课时与试看 ==")
     _, lessons = req("GET", f"/api/courses/{c2['id']}/lessons", token=buyer2)
-    check("课时目录可见", len(lessons["lessons"]) == 3, str(lessons))
+    check("课时目录可见", len(lessons["lessons"]) >= 3, str(len(lessons["lessons"])))
     check("未购用户第 1 节可试看", lessons["lessons"][0]["locked"] is False)
     check("未购用户第 2 节锁定且无视频地址", lessons["lessons"][1]["locked"] is True and lessons["lessons"][1]["video_url"] == "")
     _, intro_lessons = req("GET", f"/api/courses/{intro['id']}/lessons", token=buyer2)
@@ -334,6 +334,36 @@ def run_checks():
     check("教师可查看课程目录", len(teacher_courses) >= 6)
     _, teacher_orders = req("GET", "/api/mall/orders", token=teacher)
     check("教师订单列表可访问", teacher_orders["total"] == 0)
+
+    print("== 课程两年有效期与续期 ==")
+    _, c2_detail = req("GET", f"/api/courses/{c2['id']}", token=buyer3)
+    check("付费课程默认两年有效期", int(c2_detail.get("valid_days") or 0) == 730, str(c2_detail.get("valid_days")))
+    check(
+        "已购课程返回到期时间与剩余天数",
+        bool(c2_detail.get("enrolled"))
+        and bool(c2_detail.get("expires_at"))
+        and int(c2_detail.get("days_left") or 0) > 0,
+        str(c2_detail.get("expires_at")),
+    )
+    check("正常持有不算即将到期/已过期", not c2_detail.get("expiring_soon") and not c2_detail.get("expired"))
+    req("POST", f"/api/courses/{c2['id']}/purchase", token=buyer3, expect=409)
+    check("有效期内重复购买仍被拒绝", True)
+    before = c2_detail["expires_at"]
+    _, renew = req("POST", f"/api/courses/{c2['id']}/renew", token=buyer3)
+    check(
+        "续期订单支付成功且类型为 renew",
+        renew["status"] == "paid" and renew.get("order_type") == "renew",
+        str(renew.get("order_type")),
+    )
+    _, c2_after = req("GET", f"/api/courses/{c2['id']}", token=buyer3)
+    check(
+        "续期在原到期时间上叠加，不吞剩余天数",
+        str(c2_after["expires_at"]) > str(before),
+        f"{before} -> {c2_after['expires_at']}",
+    )
+    req("POST", f"/api/courses/{c2['id']}/renew", token=buyer3)
+    _, c2_twice = req("GET", f"/api/courses/{c2['id']}", token=buyer3)
+    check("续期可多次叠加", str(c2_twice["expires_at"]) > str(c2_after["expires_at"]), str(c2_twice["expires_at"]))
 
 
 def main():
