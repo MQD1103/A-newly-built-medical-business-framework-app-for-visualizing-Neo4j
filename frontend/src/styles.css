@@ -7513,3 +7513,228 @@ textarea:focus {
     transition: none !important;
   }
 }
+
+/* ===== 健康监测：参考区间趋势图 ===== */
+.vitals-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 2px;
+}
+
+.vitals-chart-when {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.vitals-chart-value {
+  font-size: 0.86rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vitals-chart-value em {
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 2px;
+}
+
+.vitals-chart-value.tone-ok {
+  color: #2f9c84;
+}
+
+.vitals-chart-value.tone-warn {
+  color: #c9852a;
+}
+
+.vitals-chart-value.tone-bad {
+  color: #d64f4f;
+}
+
+.vitals-chart-hit {
+  cursor: pointer;
+}
+
+.vitals-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.vitals-zone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.vitals-zone i {
+  width: 7px;
+  height: 7px;
+  border-radius: 3px;
+  opacity: 0.85;
+}
+
+.vitals-zone.tone-ok {
+  color: #2f8a76;
+}
+
+.vitals-zone.tone-warn {
+  color: #b0741f;
+}
+
+.vitals-zone.tone-bad {
+  color: #c24949;
+}
+
+.vitals-abnormal {
+  margin-left: auto;
+  font-size: 0.64rem;
+  color: #8ea3b8;
+}
+
+.vitals-abnormal.has {
+  color: #c24949;
+  font-weight: 600;
+}
+
+.vitals-chart-tip {
+  margin: 6px 0 0;
+  font-size: 0.64rem;
+}
+
+/* ===== 我的页：菜单卡片上色 ===== */
+.menu-card {
+  position: relative;
+  background: linear-gradient(168deg, #ffffff 0%, #f6faff 52%, #ecf5ff 100%);
+  border: 1px solid rgba(91, 163, 245, 0.3);
+  box-shadow: 0 8px 24px rgba(59, 134, 224, 0.1);
+}
+
+.menu-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #5ba3f5, #8fc0ff 55%, #3aa38a);
+  opacity: 0.9;
+}
+
+.menu-row {
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.menu-row::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #5ba3f5, #3b86e0);
+  transition: height 0.18s ease;
+}
+
+.menu-row:hover {
+  background: rgba(91, 163, 245, 0.09);
+}
+
+.menu-row:hover::after {
+  height: 48%;
+}
+
+.menu-row:hover .chev {
+  color: var(--blue-deep);
+}
+
+/* GitHub 外链行：青绿色区分站内跳转 */
+.menu-row-link {
+  background: linear-gradient(90deg, rgba(58, 163, 138, 0.09), transparent 72%);
+}
+
+.menu-row-link .chev {
+  color: #2f9c84;
+}
+
+.menu-row-link:hover {
+  background: rgba(58, 163, 138, 0.12);
+}
+
+.menu-row-link:hover::after {
+  background: linear-gradient(180deg, #3aa38a, #2f8a76);
+}
+
+/* ===== 社区动态：帖子卡片上色 ===== */
+.community-feed > li {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(172deg, #ffffff 0%, #f5faff 58%, #ecf5ff 100%);
+  border: 1px solid rgba(91, 163, 245, 0.28);
+  box-shadow: 0 6px 18px rgba(59, 134, 224, 0.08);
+  padding-left: 18px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.community-feed > li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #5ba3f5, #3b86e0);
+  opacity: 0.75;
+}
+
+.community-feed > li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(59, 134, 224, 0.15);
+}
+
+.community-feed > li:hover::before {
+  opacity: 1;
+}
+
+/* 头像：白色描边 + 蓝色渐变底 */
+.community-avatar {
+  border: 2px solid #fff;
+  box-shadow: 0 3px 8px rgba(59, 134, 224, 0.2);
+}
+
+.community-avatar.fallback {
+  background: linear-gradient(150deg, #8fc0ff, #3b86e0);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(30, 80, 150, 0.3);
+}
+
+/* 角色徽章：稍微加深一点存在感 */
+.community-feed .badge.soft {
+  background: rgba(91, 163, 245, 0.16);
+  border: 1px solid rgba(91, 163, 245, 0.22);
+}
+
+/* 「加好友」链接保持蓝色但加粗提示 */
+.community-feed .linkish.primary {
+  font-weight: 600;
+}
+
+/* 顶部按钮（写动态）沿用渐变 */
+.community-feed ~ * .btn-add,
+.btn-add {
+  background: linear-gradient(135deg, #5ba3f5, #3b86e0);
+  border: 0;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 134, 224, 0.28);
+}

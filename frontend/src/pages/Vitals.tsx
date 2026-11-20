@@ -77,96 +77,263 @@ function num(value: string | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function bandOf(values: number[]): [number, number] {
-  if (values.length === 0) return [0, 1]
-  const lo = Math.min(...values)
-  const hi = Math.max(...values)
-  if (lo === hi) return [lo - 1, hi + 1]
-  return [lo, hi]
+type Tone = 'ok' | 'warn' | 'bad'
+
+/** 参考区间：from ≤ v < to；to 可超过纵轴上限，绘制时会被裁掉 */
+type Zone = { from: number; to: number; tone: Tone; label: string }
+
+const ZONE_FILL: Record<Tone, string> = {
+  ok: 'rgba(58, 163, 138, 0.12)',
+  warn: 'rgba(224, 160, 58, 0.14)',
+  bad: 'rgba(227, 93, 93, 0.12)',
 }
 
-/** 迷你折线图：带参考区间带、最新值标注 */
+const ZONE_STROKE: Record<Tone, string> = {
+  ok: '#2f9c84',
+  warn: '#c9852a',
+  bad: '#d64f4f',
+}
+
+/** 血氧：以 COPD 常见目标 88–92% 为基准分区 */
+const SAT_ZONES: Zone[] = [
+  { from: 0, to: 88, tone: 'bad', label: '<88 需立即处理' },
+  { from: 88, to: 92, tone: 'ok', label: '88–92 目标区' },
+  { from: 92, to: 101, tone: 'ok', label: '≥92 正常' },
+]
+
+/** 收缩压：偏低 / 正常 / 偏高 / 危险 */
+const BP_ZONES: Zone[] = [
+  { from: 0, to: 90, tone: 'bad', label: '<90 偏低' },
+  { from: 90, to: 140, tone: 'ok', label: '90–139 正常' },
+  { from: 140, to: 180, tone: 'warn', label: '140–179 偏高' },
+  { from: 180, to: 400, tone: 'bad', label: '≥180 危险' },
+]
+
+/** 峰流速：按个人最佳的 60% / 80% 分绿黄红三区 */
+function pefZones(best: number): Zone[] {
+  return [
+    { from: 0, to: best * 0.6, tone: 'bad', label: '<60% 红区' },
+    { from: best * 0.6, to: best * 0.8, tone: 'warn', label: '60–79% 黄区' },
+    { from: best * 0.8, to: best * 1.3, tone: 'ok', label: '≥80% 绿区' },
+  ]
+}
+
+/** 体重：近几次均值 ±2kg 作为稳定带 */
+function weightZones(center: number): Zone[] {
+  return [{ from: center - 2, to: center + 2, tone: 'ok', label: '±2kg 稳定带' }]
+}
+
+function toneOf(value: number, zones: Zone[] | undefined, outside: Tone = 'ok'): Tone {
+  if (!zones) return 'ok'
+  const hit = zones.find((z) => value >= z.from && value < z.to)
+  return hit ? hit.tone : outside
+}
+
+function domainOf(points: number[], zones?: Zone[]): [number, number] {
+  const values = zones
+    ? [...points, ...zones.flatMap((z) => [z.from, z.to]).filter((v) => Number.isFinite(v))]
+    : points
+  const lo0 = Math.min(...values)
+  const hi0 = Math.max(...values)
+  const span = hi0 - lo0 || 1
+  return [lo0 - span * 0.12, hi0 + span * 0.12]
+}
+
+/**
+ * 折线趋势图：按参考区间分区着色 + 阈值虚线 + 异常点高亮 + 点选查看单条数值。
+ * domain 可固定纵轴范围（如血氧固定 80–100），避免区间被数据拉伸到失真。
+ */
 function Trend({
   points,
   unit,
-  band,
+  zones,
   times,
+  domain,
+  outside = 'ok',
 }: {
   points: number[]
   unit: string
-  band?: [number, number]
+  zones?: Zone[]
   times?: string[]
+  domain?: [number, number]
+  /** 落在所有区间之外时的颜色，体重这类「只有稳定带」的指标传 warn */
+  outside?: Tone
 }) {
+  const [focus, setFocus] = useState<number | null>(null)
+
   if (points.length === 0) {
     return <p className="muted vitals-empty">还没有数据，录入后这里会显示趋势。</p>
   }
 
   const W = 320
-  const H = 96
-  const PX = 12
+  const H = 116
+  const PX = 24
+  const PR = 40
   const PY = 14
-  const [bLo, bHi] = band ?? bandOf(points)
-  const all = band ? [...points, bLo, bHi] : points
-  const lo0 = Math.min(...all)
-  const hi0 = Math.max(...all)
-  const span = hi0 - lo0 || 1
-  const lo = lo0 - span * 0.15
-  const hi = hi0 + span * 0.15
+  const PB = 12
+  const [dLo, dHi] = domain ?? domainOf(points, zones)
+  const span = dHi - dLo || 1
+  const plotW = W - PX - PR
+  const plotH = H - PY - PB
 
   const x = (i: number) =>
-    points.length === 1 ? W / 2 : PX + (i * (W - PX * 2)) / (points.length - 1)
-  const y = (v: number) => H - PY - ((v - lo) / (hi - lo)) * (H - PY * 2)
+    points.length === 1 ? PX + plotW / 2 : PX + (i * plotW) / (points.length - 1)
+  const y = (v: number) => PY + ((dHi - Math.min(Math.max(v, dLo), dHi)) / span) * plotH
   const line = points
     .map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`)
     .join(' ')
-  const last = points[points.length - 1]
+
+  const tones = points.map((v) => toneOf(v, zones, outside))
+  const abnormal = tones.filter((t) => t !== 'ok').length
+  const active = focus ?? points.length - 1
+  const activeValue = points[active]
+  const activeTone = tones[active]
 
   return (
     <div className="vitals-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="趋势图">
-        {band ? (
-          <rect
-            x={0}
-            y={y(bHi)}
-            width={W}
-            height={Math.max(0, y(bLo) - y(bHi))}
-            fill="rgba(58, 163, 138, 0.12)"
-          />
-        ) : null}
+      <div className="vitals-chart-head">
+        <span className="vitals-chart-when">
+          {times?.[active] ? `${times[active]}` : '最近一次'}
+        </span>
+        <span className={`vitals-chart-value tone-${activeTone}`}>
+          {activeValue} <em>{unit}</em>
+        </span>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`趋势图，共 ${points.length} 条记录`}>
+        <defs>
+          <clipPath id="vitals-plot">
+            <rect x={PX} y={PY - 4} width={plotW} height={plotH + 8} />
+          </clipPath>
+        </defs>
+
+        <g clipPath="url(#vitals-plot)">
+          {zones?.map((z) => {
+            const from = Math.max(z.from, dLo)
+            const to = Math.min(z.to, dHi)
+            if (to <= from) return null
+            return (
+              <rect
+                key={`${z.label}-${z.from}`}
+                x={PX}
+                y={y(to)}
+                width={plotW}
+                height={Math.max(1, y(from) - y(to))}
+                fill={ZONE_FILL[z.tone]}
+              />
+            )
+          })}
+
+          {zones
+            ?.filter((z) => z.from > dLo && z.from < dHi)
+            .map((z) => (
+              <line
+                key={`th-${z.from}`}
+                x1={PX}
+                y1={y(z.from)}
+                x2={PX + plotW}
+                y2={y(z.from)}
+                stroke={ZONE_STROKE[z.tone]}
+                strokeWidth="1"
+                strokeDasharray="3 3"
+                opacity="0.55"
+              />
+            ))}
+
+          <path d={line} fill="none" stroke="#5ba3f5" strokeWidth="2" strokeLinecap="round" />
+
+          {points.length > 1 ? (
+            <line
+              x1={x(active)}
+              y1={PY}
+              x2={x(active)}
+              y2={PY + plotH}
+              stroke="#b9cde4"
+              strokeWidth="1"
+              strokeDasharray="2 3"
+            />
+          ) : null}
+
+          {points.map((v, i) => (
+            <g key={`${i}-${v}`}>
+              <circle
+                cx={x(i)}
+                cy={y(v)}
+                r={i === active ? 4 : i === points.length - 1 ? 3.2 : 2.4}
+                fill={ZONE_STROKE[tones[i]]}
+                stroke="#ffffff"
+                strokeWidth={i === active ? 1.5 : 0.8}
+              />
+              <circle
+                cx={x(i)}
+                cy={y(v)}
+                r={9}
+                fill="transparent"
+                className="vitals-chart-hit"
+                onPointerDown={() => setFocus(i)}
+                onPointerEnter={() => setFocus(i)}
+              />
+            </g>
+          ))}
+        </g>
+
+        {/* 纵轴刻度 */}
+        <text x={PX - 4} y={PY + 4} textAnchor="end" fontSize="9" fill="#9db2c6">
+          {Math.round(dHi)}
+        </text>
+        <text x={PX - 4} y={PY + plotH + 3} textAnchor="end" fontSize="9" fill="#9db2c6">
+          {Math.round(dLo)}
+        </text>
+
+        {/* 阈值标注（右侧） */}
+        {zones
+          ?.filter((z) => z.from > dLo && z.from < dHi)
+          .map((z) => (
+            <text
+              key={`tl-${z.from}`}
+              x={PX + plotW + 4}
+              y={y(z.from) + 3}
+              fontSize="8.5"
+              fill={ZONE_STROKE[z.tone]}
+            >
+              {Math.round(z.from)}
+            </text>
+          ))}
+
         <line
-          x1={0}
-          y1={H - PY}
-          x2={W}
-          y2={H - PY}
+          x1={PX}
+          y1={PY + plotH}
+          x2={PX + plotW}
+          y2={PY + plotH}
           stroke="#e3edf8"
           strokeWidth="1"
         />
-        <path d={line} fill="none" stroke="#5ba3f5" strokeWidth="2" strokeLinecap="round" />
-        {points.map((v, i) => (
-          <circle
-            key={`${i}-${v}`}
-            cx={x(i)}
-            cy={y(v)}
-            r={i === points.length - 1 ? 3.4 : 2.2}
-            fill={i === points.length - 1 ? '#3b86e0' : '#9ec8f5'}
-          />
-        ))}
-        <text x={W - 2} y={y(last) - 6} textAnchor="end" fontSize="10" fill="#3b86e0">
-          {last} {unit}
-        </text>
-        <text x={2} y={y(hi0) + 3} fontSize="9" fill="#9db2c6">
-          {hi0}
-        </text>
-        <text x={2} y={y(lo0) + 3} fontSize="9" fill="#9db2c6">
-          {lo0}
-        </text>
       </svg>
+
       {times && times.length > 0 ? (
         <div className="vitals-chart-axis">
           <span>{times[0]}</span>
           <span>{times[times.length - 1]}</span>
         </div>
       ) : null}
+
+      {zones && zones.length > 0 ? (
+        <div className="vitals-chart-legend">
+          {zones.map((z) => (
+            <span key={`lg-${z.label}`} className={`vitals-zone tone-${z.tone}`}>
+              <i style={{ background: ZONE_STROKE[z.tone] }} />
+              {z.label}
+            </span>
+          ))}
+          <span className={`vitals-abnormal${abnormal > 0 ? ' has' : ''}`}>
+            {abnormal > 0 ? `${abnormal} 个点在参考区间外` : '全部在参考区间内'}
+          </span>
+        </div>
+      ) : (
+        <p className="meta vitals-chart-tip">
+          点一下折线上的圆点可以看那一天的数值。
+        </p>
+      )}
     </div>
   )
 }
@@ -370,7 +537,8 @@ function SatPanel({ onTip }: { onTip: (t: string) => void }) {
         <Trend
           points={recent.map((r) => r.spo2 as number)}
           unit="%"
-          band={[88, 92]}
+          zones={SAT_ZONES}
+          domain={[80, 100]}
           times={recent.map((r) => shortDate(r.at))}
         />
         {check ? (
@@ -530,6 +698,8 @@ function PefPanel({ onTip }: { onTip: (t: string) => void }) {
         <Trend
           points={recent.map((r) => r.value as number)}
           unit="L/min"
+          zones={bestNum && bestNum > 0 ? pefZones(bestNum) : undefined}
+          domain={bestNum && bestNum > 0 ? [0, Math.ceil((bestNum * 1.15) / 10) * 10] : undefined}
           times={recent.map((r) => shortDate(r.date))}
         />
         {zone ? (
@@ -580,6 +750,14 @@ function WeightPanel({ onTip }: { onTip: (t: string) => void }) {
 
   const recent = ordered.slice(-14)
   const latest = ordered[ordered.length - 1]
+
+  // 最近 7 条的均值作为稳定带中心：±2kg 之外提示留意（下降多为营养风险，上升多为水肿）
+  const bandCenter = useMemo(() => {
+    const tail = ordered.slice(-7)
+    if (tail.length === 0) return null
+    const sum = tail.reduce((acc, r) => acc + (r.kg as number), 0)
+    return Number((sum / tail.length).toFixed(1))
+  }, [ordered])
 
   const drop = useMemo(() => {
     if (ordered.length < 2 || !latest) return null
@@ -657,6 +835,8 @@ function WeightPanel({ onTip }: { onTip: (t: string) => void }) {
         <Trend
           points={recent.map((r) => r.kg as number)}
           unit="kg"
+          zones={bandCenter !== null ? weightZones(bandCenter) : undefined}
+          outside="warn"
           times={recent.map((r) => shortDate(r.date))}
         />
         {drop ? (
@@ -842,7 +1022,8 @@ function BpPanel({ onTip }: { onTip: (t: string) => void }) {
         <Trend
           points={recent.map((r) => r.sys as number)}
           unit="mmHg"
-          band={[90, 140]}
+          zones={BP_ZONES}
+          domain={[60, 200]}
           times={recent.map((r) => shortDate(r.date))}
         />
         {check ? (
