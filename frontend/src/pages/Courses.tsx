@@ -103,6 +103,7 @@ export default function Courses() {
   const [checks, setChecks] = useState<Record<string, LessonCheckItem>>({})
   const [checkPick, setCheckPick] = useState<number | null>(null)
   const playerRef = useRef<HTMLDivElement>(null)
+  const detailRef = useRef<HTMLElement>(null)
 
   const isAdmin = user?.role === 'admin'
 
@@ -122,6 +123,10 @@ export default function Courses() {
         const c = await load()
         if (focusId && c.some((x) => x.id === focusId)) {
           setActiveId(focusId)
+          // 带 ?id= 直达时，数据加载后滚到详情区
+          window.setTimeout(() => {
+            detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 120)
         } else if (c.length && activeId == null) {
           setActiveId(c[0].id)
         }
@@ -372,6 +377,10 @@ export default function Courses() {
     setQuizResult(null)
     setQuizError('')
     setSearchParams(id ? { id: String(id) } : {})
+    // 详情区在卡片网格下方，点卡片后自动滚动过去，避免「点了没反应」
+    window.setTimeout(() => {
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
   }
 
   async function openQuiz() {
@@ -703,7 +712,7 @@ export default function Courses() {
           </div>
 
           {activeVisible && active && (
-            <section className="item-card course-detail">
+            <section className="item-card course-detail" ref={detailRef}>
               <div className="course-detail-cover">
                 <Cover src={active.cover_url} alt={active.name} />
               </div>
