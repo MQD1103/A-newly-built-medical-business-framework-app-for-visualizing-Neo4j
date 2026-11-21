@@ -8,6 +8,19 @@ import { formatDate, formatPrice, mediaUrl, priceText, weekdayLabel } from '../u
 /** 课程价格兜底值，与后端 courses.py 的默认售价保持一致 */
 const PRICE_FALLBACK = 2.99
 
+/**
+ * 课时视频/海报缓存版本号。
+ * 服务端同名文件被替换后，浏览器会复用旧缓存（视频资源尤其顽固，Ctrl+F5 都清不掉）。
+ * 每次更新 lesson-*.mp4 / .jpg 后递增本值，URL 变化即强制重新拉取。
+ */
+const LESSON_MEDIA_VERSION = '20261121b'
+
+function lessonMediaUrl(path?: string | null): string {
+  const url = mediaUrl(path)
+  if (!url) return ''
+  return `${url}${url.includes('?') ? '&' : '?'}v=${LESSON_MEDIA_VERSION}`
+}
+
 function Cover({ src, alt }: { src?: string; alt: string }) {
   if (src) {
     return <img src={mediaUrl(src)} alt={alt} className="course-cover-img" loading="lazy" />
@@ -838,8 +851,8 @@ export default function Courses() {
                       <video
                         key={activeLesson.id}
                         className="lesson-player"
-                        src={mediaUrl(activeLesson.video_url)}
-                        poster={mediaUrl(
+                        src={lessonMediaUrl(activeLesson.video_url)}
+                        poster={lessonMediaUrl(
                           activeLesson.video_url.replace(/\.mp4$/i, '.jpg'),
                         )}
                         controls
